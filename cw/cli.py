@@ -48,11 +48,11 @@ class CodeWalkCli:
         help_text = """
 **Available Commands:**
 
-• `/help` - Show this help message
-• `/config` - Show current configuration
-• `/set <param> <value>` - Set configuration parameter
-• `/exit` or `/quit` - Exit the application
-• `/clear` - Clear the screen
+• `/help` - Show this help message\n
+• `/config` - Show current configuration\n
+• `/set <param> <value>` - Set configuration parameter\n
+• `/exit` or `/quit` - Exit the application\n
+• `/clear` - Clear the screen\n
 
 **Usage:**
 Type your query or question about the codebase, and CodeWalk will analyze it.
@@ -148,7 +148,7 @@ Use slash commands (/) for special operations.
         while self.running:
             try:
                 user_input = Prompt.ask(
-                    "[bold cyan]CodeWalk[/bold cyan]",
+                    "[bold cyan]CodeWalk[/bold cyan] ",
                     default="",
                     show_default=False
                 ).strip()
@@ -165,8 +165,8 @@ Use slash commands (/) for special operations.
                 self.console.print()
                 
             except KeyboardInterrupt:
-                self.console.print("\n[yellow]Use /exit to quit properly.[/yellow]")
-                continue
+                self.console.print("\n[yellow]Next time use /exit to quit properly.[/yellow]")
+                break
             except EOFError:
                 self.console.print("\n[yellow]Goodbye![/yellow]")
                 break
