@@ -185,3 +185,185 @@ class LlmModel:
             completion_kwargs["tool_choice"] = tool_choice
         
         return completion(**completion_kwargs)
+
+
+# Example usage of the above class
+########################################################################################
+if __name__ == "__main__":
+    # Initialize the model
+    llm = LlmModel(
+        model="gpt-3.5-turbo",
+        api_key="your-api-key-here",  # Or set OPENAI_API_KEY environment variable
+        temperature=0.7
+    )
+    
+    # Define some example tools
+    tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": "get_weather",
+                "description": "Get the current weather for a given location",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "location": {
+                            "type": "string",
+                            "description": "The city and state, e.g. San Francisco, CA"
+                        },
+                        "unit": {
+                            "type": "string",
+                            "enum": ["celsius", "fahrenheit"],
+                            "description": "Temperature unit"
+                        }
+                    },
+                    "required": ["location"]
+                }
+            }
+        },
+        {
+            "type": "function", 
+            "function": {
+                "name": "search_files",
+                "description": "Search for files in a directory",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "directory": {
+                            "type": "string",
+                            "description": "Directory path to search in"
+                        },
+                        "pattern": {
+                            "type": "string", 
+                            "description": "File pattern to search for (e.g., '*.py')"
+                        }
+                    },
+                    "required": ["directory", "pattern"]
+                }
+            }
+        }
+    ]
+    
+    # Create messages
+    messages = [
+        Message(
+            role="system",
+            content="You are a helpful assistant that can call tools to help users."
+        ),
+        Message(
+            role="user", 
+            content="What's the weather in San Francisco and can you search for Python files in the /home/user directory?"
+        )
+    ]
+    
+    # Make completion request with tools
+    try:
+        response = llm.complete(
+            messages=messages,
+            tools=tools,
+            tool_choice="auto"  # Let the model decide which tools to use
+        )
+        
+        print("Response content:", response.content)
+        print("Finish reason:", response.finish_reason)
+        print("Usage:", response.usage)
+        
+        # Check if model made tool calls
+        if response.tool_calls:
+            print(f"\nModel made {len(response.tool_calls)} tool call(s):")
+            
+            # Add assistant message with tool calls to conversation
+            messages.append(Message(
+                role="assistant",
+                content=response.content,
+                tool_calls=response.tool_calls
+            ))
+            
+            # Process each tool call and create responses
+            tool_responses = []
+            for i, tool_call in enumerate(response.tool_calls):
+                print(f"  Tool call {i+1}:")
+                print(f"    ID: {tool_call.id}")
+                print(f"    Type: {tool_call.type}")
+                print(f"    Function: {tool_call.function}")
+                
+                # Simulate tool execution based on function name
+                function_name = tool_call.function.get("name", "")
+                if function_name == "get_weather":
+                    tool_result = "The weather in San Francisco is 72°F and sunny."
+                elif function_name == "search_files":
+                    tool_result = "Found 15 Python files: app.py, utils.py, models.py, test_main.py, config.py..."
+                else:
+                    tool_result = f"Tool {function_name} executed successfully."
+                
+                # Create ToolCallResponse object
+                tool_response = ToolCallResponse(
+                    id=f"resp_{tool_call.id}",
+                    content=tool_result,
+                    tool_call_id=tool_call.id
+                )
+                tool_responses.append(tool_response)
+                
+                # Add tool response message to conversation
+                messages.append(Message(
+                    role="tool",
+                    content=tool_response.content,
+                    tool_call_id=tool_response.tool_call_id
+                ))
+                
+                print(f"    Response: {tool_response.content}")
+            
+            # Get final response after tool calls
+            final_response = llm.complete(messages=messages)
+            print(f"\nFinal response after tool execution:")
+            print(f"Content: {final_response.content}")
+            print(f"Finish reason: {final_response.finish_reason}")
+        
+    except Exception as e:
+        print(f"Error: {e}")
+        
+    # Example of creating tool calls manually
+    print("\n" + "="*50)
+    print("Manual tool call creation example:")
+    
+    # Create a ToolCall manually
+    manual_tool_call = ToolCall(
+        id="call_123",
+        type="function",
+        function={
+            "name": "calculate_sum",
+            "arguments": '{"numbers": [1, 2, 3, 4, 5]}'
+        }
+    )
+    
+    # Create corresponding response
+    manual_tool_response = ToolCallResponse(
+        id="resp_123",
+        content="The sum is 15",
+        tool_call_id="call_123"
+    )
+    
+    print(f"Manual tool call: {manual_tool_call}")
+    print(f"Manual tool response: {manual_tool_response}")
+    
+    # Example of streaming
+    print("\n" + "="*50)
+    print("Streaming example:")
+    
+    stream_messages = [
+        Message(role="user", content="Tell me a short story about a robot.")
+    ]
+    
+    try:
+        stream = llm.stream_complete(messages=stream_messages)
+        print("Streaming response: ", end="", flush=True)
+        for chunk in stream:
+            if hasattr(chunk, 'choices') and chunk.choices:
+                if hasattr(chunk.choices[0], 'delta') and hasattr(chunk.choices[0].delta, 'content'):
+                    content = chunk.choices[0].delta.content
+                    if content:
+                        print(content, end="", flush=True)
+        print()  # New line after streaming
+        
+    except Exception as e:
+        print(f"Streaming error: {e}")
