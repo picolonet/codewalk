@@ -7,17 +7,8 @@ from rich.text import Text
 from rich.markdown import Markdown
 from rich import print as rprint
 import sys
+from code_walker import code_walker
 
-
-class CodeWalker:
-    """Stub class for code walking functionality - to be implemented later."""
-    
-    def __init__(self):
-        pass
-    
-    def process_query(self, query: str) -> str:
-        """Process a user query and return a response."""
-        return f"CodeWalker processed: {query}"
 
 
 class CodeWalkCli:
@@ -25,7 +16,6 @@ class CodeWalkCli:
     
     def __init__(self):
         self.console = Console()
-        self.code_walker = CodeWalker()
         self.running = True
         self.config = {
             "model": "gpt-3.5-turbo",
@@ -129,11 +119,11 @@ Use slash commands (/) for special operations.
     def process_query(self, query: str):
         """Process a user query through the CodeWalker."""
         with self.console.status("[bold green]Processing query...", spinner="dots"):
-            response = self.code_walker.process_query(query)
+            response = code_walker.run_query(query)
         
         # Display the response in a panel
         self.console.print(Panel(
-            response,
+            response.content if response.content else "No response",
             title="Response",
             border_style="blue",
             padding=(1, 2)

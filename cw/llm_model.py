@@ -7,7 +7,8 @@ from rich.panel import Panel
 import json
 from litellm.types.utils import ModelResponse
 from litellm.types.utils import StreamingChoices
-
+import os
+from dotenv import load_dotenv
 
 class ToolCall(BaseModel):
     id: str
@@ -367,3 +368,24 @@ if __name__ == "__main__":
         
     except Exception as e:
         print(f"Streaming error: {e}")
+else:
+    print("LlmModel class is not being run as the main module.")
+
+
+
+# Get API key from .env file
+load_dotenv()
+api_key = os.environ.get("CODEWALKER_API_KEY")
+base_url = os.environ.get("CODEWALKER_BASE_URL")
+model_name = os.environ.get("CODEWALKER_MODEL_NAME") or "gpt-3.5-turbo"
+
+llm = LlmModel(
+    model=model_name,
+    base_url=base_url,
+    api_key=api_key,  # Or set OPENAI_API_KEY environment variable
+    temperature=0.7
+)
+
+
+
+
