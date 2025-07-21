@@ -29,6 +29,7 @@ class Message(BaseModel):
     tool_call_id: Optional[str] = None
 
 
+# TODO: Create a static dummy constant.
 class LlmResponse(BaseModel):
     content: Optional[str] = None
     tool_calls: Optional[List[ToolCall]] = None
@@ -77,14 +78,51 @@ class LlmModel:
 
 
     def _debug_print_formatted_messages(self, formatted_messages: List[Dict[str, Any]]) -> None:
-        """Pretty prints formatted messages to terminal for debugging using rich."""
-
-        console = Console()
+        """Log formatted messages for debugging."""
+        import logging
+        
+        logger = logging.getLogger(__name__)
         
         for i, msg in enumerate(formatted_messages):
-            title = f"Message {i+1} ({msg.get('role', 'unknown role')})"
-            json_str = json.dumps(msg, indent=2)
-            console.print(Panel(json_str, title=title, border_style="blue"))
+            role = msg.get('role', 'unknown role')
+            
+            # Create a more readable log message
+            if role == 'user':
+                content = msg.get('content', '')
+                if len(content) > 100:
+                    content = content[:100] + "..."
+                logger.info(f"User message: {content}")
+            
+            elif role == 'assistant':
+                content = msg.get('content', '')
+                tool_calls = msg.get('tool_calls', [])
+                
+                if content:
+                    if len(content) > 100:
+                        content = content[:100] + "..."
+                    logger.info(f"Assistant response: {content}")
+                
+                if tool_calls:
+                    logger.info(f"Assistant made {len(tool_calls)} tool call(s)")
+                    for j, tool_call in enumerate(tool_calls):
+                        func_name = tool_call.get('function', {}).get('name', 'unknown')
+                        logger.info(f"  Tool {j+1}: {func_name}")
+            
+            elif role == 'tool':
+                tool_id = msg.get('tool_call_id', 'unknown')
+                content = msg.get('content', '')
+                if len(content) > 100:
+                    content = content[:100] + "..."
+                logger.info(f"Tool response (ID: {tool_id}): {content}")
+            
+            elif role == 'system':
+                content = msg.get('content', '')
+                if len(content) > 100:
+                    content = content[:100] + "..."
+                logger.info(f"System message: {content}")
+            
+            else:
+                logger.debug(f"Message {i+1} ({role}): {json.dumps(msg, indent=2)}")
 
 
 

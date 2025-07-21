@@ -1,8 +1,16 @@
 from typing import Dict, Any, List, Optional, Callable
-from llm_model import LlmModel, Message, ToolCall, ToolCallResponse
+from llm_model import LlmModel, LlmResponse, Message, ToolCall, ToolCallResponse
 import json
 import inspect
+from pydantic import BaseModel
+import os
 
+
+class CompletionResult(BaseModel):
+    """Result of a completion with tools. Includes the full conversation and the current conversation."""
+    has_tool_calls: bool
+    full_conversation: List[Message]
+    current_result: List[Message]
 
 class ToolCaller:
     """Handles tool registration and execution for LLM interactions."""
@@ -26,13 +34,13 @@ class ToolCaller:
         self.tools[name] = tool_schema
         self.tool_functions[name] = function
     
-    def register_tool_from_function(self, function: Callable, description: str = None) -> None:
+    def register_tool_from_function(self, function: Callable, description: Optional[str] = None) -> None:
         """Register a tool automatically from a function's signature and docstring."""
         name = function.__name__
         
         # Use provided description or extract from docstring
         if description is None:
-            description = function.__doc__ or f"Function {name}"
+            description = function.__doc__ or f"Function {name}" or ""
         
         # Extract parameters from function signature
         sig = inspect.signature(function)
@@ -104,8 +112,7 @@ class ToolCaller:
                 tool_call_id=tool_call.id
             )
     
-    def complete_with_tools(self, messages: List[Message], 
-                           tool_choice: Optional[str] = "auto",
+    def complete_with_tools(self, messages: List[Message], tool_choice: Optional[str] = "auto",
                            max_iterations: int = 5) -> List[Message]:
         """Complete a conversation with automatic tool execution."""
         conversation = messages.copy()
@@ -144,10 +151,56 @@ class ToolCaller:
         
         return conversation
 
+    def full_completion_with_tools(self, messages: List[Message], tool_choice: Optional[str] = "auto",
+                           max_iterations: int = 5 ) -> CompletionResult:
+        """Complete a conversation with automatic tool execution."""
+        full_conversation = messages.copy()
+        current_result: List[Message] = []
+        has_tool_calls = False
+    
+        
+        for iteration in range(max_iterations):
+            # Get response from LLM
+            last_response = self.llm_model.complete(messages=full_conversation, tools=self.get_tool_schemas(),
+                tool_choice=tool_choice)
+            
+            # Add assistant message to conversation
+            assistant_message = Message(
+                role = "assistant",
+                content = last_response.content,
+                tool_calls = last_response.tool_calls
+            )
+            full_conversation.append(assistant_message)
+            current_result.append(assistant_message)
+            
+            
+            # If no tool calls, we're done
+            if not last_response.tool_calls:
+                break
+            has_tool_calls = True
+            
+            # Execute each tool call
+            for tool_call in last_response.tool_calls:
+                tool_response = self.execute_tool(tool_call)
+                
+                # Add tool response to conversation
+                tool_message = Message(
+                    role="tool",
+                    content=tool_response.content,
+                    tool_call_id=tool_response.tool_call_id
+                )
+                full_conversation.append(tool_message)
+                current_result.append(tool_message)
+        
+        return CompletionResult(has_tool_calls=has_tool_calls, full_conversation=full_conversation, current_result=current_result)
+
+
 
 # Example usage functions that could be registered as tools
 def get_file_contents(file_path: str) -> str:
     """Read and return the contents of a file."""
+    if os.path.getsize(file_path) == 0:
+        return "empty file"
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
             return f.read()
@@ -156,6 +209,12 @@ def get_file_contents(file_path: str) -> str:
 
 
 def list_directory(directory_path: str) -> str:
+    """List files and directories in the given path."""
+    actual_result = _list_directory_internal(directory_path)
+    result = f"Search result for files in {directory} matching {pattern}:\n<result>\n{actual_result}\n<\result>"
+    return result
+
+def _list_directory_internal(directory_path: str) -> str:
     """List files and directories in the given path."""
     import os
     try:
@@ -166,6 +225,13 @@ def list_directory(directory_path: str) -> str:
 
 
 def search_files(directory: str, pattern: str) -> str:
+    """Search for files matching a pattern in a directory."""
+
+    actual_result = _search_files_internal(directory, pattern)
+    result = f"Search result for files in {directory} matching {pattern}:\n<result>\n{actual_result}\n<\result>"
+    return result
+    
+def _search_files_internal(directory: str, pattern: str) -> str:
     """Search for files matching a pattern in a directory."""
     import os
     import fnmatch
