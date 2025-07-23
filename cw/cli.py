@@ -1,4 +1,4 @@
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Prompt
@@ -14,7 +14,8 @@ import logging
 from code_walker import code_walker
 from tool_caller import CompletionResult
 import json
-
+from util.livepanel import LivePanel
+from llm_model import Message, format_messages
 
 
 class CodeWalkCli:
@@ -53,8 +54,8 @@ class CodeWalkCli:
         self.debug_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
         
         # Add handler to root logger
-        logging.getLogger().addHandler(self.debug_handler)
-        logging.getLogger().setLevel(logging.DEBUG)
+        # logging.getLogger().addHandler(self.debug_handler)
+        # logging.getLogger().setLevel(logging.DEBUG)
     
     def add_debug_message(self, message: str, level: str = "INFO"):
         """Add a debug message to the debug panel."""
@@ -78,6 +79,19 @@ class CodeWalkCli:
         if len(self.debug_messages) > 50:
             self.debug_messages = self.debug_messages[-50:]
         
+    def start_debugpanel(self):
+        self.debug_panel = LivePanel()
+        self.debug_panel.start()
+
+    def post_debugpanel(self, title: str, messages: List[Message]):
+        formatted_message = format_messages(messages)
+        self.post_debugpanel(title, formatted_message)
+
+    def post_debugpanel(self, title: str, message: str):
+        self.debug_panel.add_message(f"{title}\n {message}")
+
+    def stop_debugpanel(self):
+        self.debug_panel.stop()
     
     def show_content(self, content: str, title: str = "CodeWalk"):
         """Display content in a panel."""
@@ -274,6 +288,7 @@ Use slash commands (/) for special operations.
                 self.add_debug_message(error_msg, "ERROR")
 
 
+cli = CodeWalkCli()
+
 if __name__ == "__main__":
-    cli = CodeWalkCli()
     cli.run()

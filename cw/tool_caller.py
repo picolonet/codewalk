@@ -1,9 +1,16 @@
 from typing import Dict, Any, List, Optional, Callable
-from llm_model import LlmModel, LlmResponse, Message, ToolCall, ToolCallResponse
+from llm_model import LlmModel, LlmResponse, Message, ToolCall, ToolCallResponse, format_messages
 import json
 import inspect
 from pydantic import BaseModel
+from cli import cli
+
 import os
+
+IGNORE_FILE_LIST = [".git", ".env", ".github", ".claude", ".venv_1"]
+
+def filter_list(input_list, ignore_list):
+    return [item for item in input_list if item not in ignore_list]
 
 
 class CompletionResult(BaseModel):
@@ -154,10 +161,14 @@ class ToolCaller:
     def full_completion_with_tools(self, messages: List[Message], tool_choice: Optional[str] = "auto",
                            max_iterations: int = 5 ) -> CompletionResult:
         """Complete a conversation with automatic tool execution."""
+
+        # Debug live panel to print each round of messages
+        cli.start_debugpanel()
+        cli.post_debugpanel("New Query:", messages=messages)
+
         full_conversation = messages.copy()
         current_result: List[Message] = []
-        has_tool_calls = False
-    
+        has_tool_calls = False    
         
         for iteration in range(max_iterations):
             # Get response from LLM
@@ -170,6 +181,10 @@ class ToolCaller:
                 content = last_response.content,
                 tool_calls = last_response.tool_calls
             )
+
+            # Post to debug panel
+            cli.post_debugpanel("Response from LLM:", [assistant_message])
+
             full_conversation.append(assistant_message)
             current_result.append(assistant_message)
             
@@ -189,9 +204,12 @@ class ToolCaller:
                     content=tool_response.content,
                     tool_call_id=tool_response.tool_call_id
                 )
+                # Debug panel: Tool call
+                cli.post_debugpanel("Tool call output to LLM:", [tool_message])
                 full_conversation.append(tool_message)
                 current_result.append(tool_message)
         
+        cli.stop_debugpanel()
         return CompletionResult(has_tool_calls=has_tool_calls, full_conversation=full_conversation, current_result=current_result)
 
 
@@ -211,7 +229,7 @@ def get_file_contents(file_path: str) -> str:
 def list_directory(directory_path: str) -> str:
     """List files and directories in the given path."""
     actual_result = _list_directory_internal(directory_path)
-    result = f"Search result for files in {directory} matching {pattern}:\n<result>\n{actual_result}\n<\result>"
+    result = f"Result of listing files in {directory_path}:\n<result>\n{actual_result}\n<\result>"
     return result
 
 def _list_directory_internal(directory_path: str) -> str:
@@ -219,6 +237,7 @@ def _list_directory_internal(directory_path: str) -> str:
     import os
     try:
         items = os.listdir(directory_path)
+        items = filter_list(items, IGNORE_FILE_LIST)
         return "\n".join(items)
     except Exception as e:
         return f"Error listing directory: {str(e)}"
