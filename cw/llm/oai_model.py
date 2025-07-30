@@ -11,7 +11,8 @@ from openai.types.chat import ChatCompletion, ChatCompletionMessage
 from openai.types.chat.chat_completion import Choice
 from openai.types.chat.chat_completion_message_tool_call import ChatCompletionMessageToolCall
 
-from llm_model import LlmModel, Message, LlmResponse, ToolCall
+from util.data_logger import get_data_logger
+from llm.llm_model import LlmModel, Message, LlmResponse, ToolCall
 from console_logger import console_logger
 
 
@@ -132,6 +133,10 @@ class OaiModel(LlmModel):
             latency_seconds=latency
         )
 
+        
+    def model_name(self) -> str:
+        return "oai"
+
     def complete(self, messages: List[Message], tools: Optional[List[Dict[str, Any]]] = None,
                 tool_choice: Optional[Union[str, Dict[str, Any]]] = None, **kwargs) -> LlmResponse:
         """Synchronous completion using OpenAI models."""
@@ -164,6 +169,10 @@ class OaiModel(LlmModel):
             
             # Debug logging
             self._debug_print_llm_response(llm_response)
+            data_logger = get_data_logger()
+            data_logger.log_stats(self.model_name(), prompt_tokens=llm_response.get_prompt_tokens(),
+                 completion_tokens=llm_response.get_completion_tokens(), latency_seconds=llm_response.get_latency_seconds(),
+                  operation="tool_call" if tool_choice else "completion")
             
             return llm_response
             

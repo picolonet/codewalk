@@ -9,6 +9,7 @@ from rich import print as rprint
 import sys
 from code_walker import code_walker
 from console_logger import console_logger
+from llm.llm_router import llm_router
 
 
 class CodeWalkCli:
@@ -18,7 +19,7 @@ class CodeWalkCli:
         self.console = console_logger.console
         self.running = True
         self.config = {
-            "model": "gpt-3.5-turbo",
+           # "model": "gpt-3.5-turbo",
             "temperature": 0.7,
             "max_tokens": 1000,
         }
@@ -41,12 +42,22 @@ class CodeWalkCli:
 • `/help` - Show this help message\n
 • `/config` - Show current configuration\n
 • `/set <param> <value>` - Set configuration parameter\n
+• `/model <type>` - Switch LLM model (oai, claude, llama)\n
+• `/codewalk [subdirectory]` - Run codewalk analysis (optional subdirectory path)\n
 • `/exit` or `/quit` - Exit the application\n
 • `/clear` - Clear the screen\n
 
 **Usage:**
 Type your query or question about the codebase, and CodeWalk will analyze it.
 Use slash commands (/) for special operations.
+
+**Examples:**
+• `/model oai` - Switch to OpenAI GPT-4o
+• `/model claude` - Switch to Anthropic Claude
+• `/model llama` - Switch to Llama4 Scout via Groq
+• `/codewalk` - Analyze current directory
+• `/codewalk src` - Analyze the 'src' subdirectory
+• `/codewalk /path/to/project` - Analyze specific directory path
         """
         self.console.print(Panel(Markdown(help_text), title="Help", border_style="green"))
     
@@ -55,6 +66,14 @@ Use slash commands (/) for special operations.
         table = Table(title="Current Configuration")
         table.add_column("Parameter", style="cyan")
         table.add_column("Value", style="magenta")
+        
+        # Add current model to configuration display
+        try:
+            router = llm_router()
+            current_model = router.get_current_model_name()
+            table.add_row("current_model", current_model)
+        except Exception:
+            table.add_row("current_model", "unknown")
         
         for key, value in self.config.items():
             table.add_row(key, str(value))
@@ -110,18 +129,76 @@ Use slash commands (/) for special operations.
         elif command == 'clear':
             self.console.clear()
             self.show_banner()
+        elif command == 'model':
+            if len(args) == 1:
+                self.set_model(args[0])
+            else:
+                self.console.print("[red]Usage: /model <type>[/red]")
+                self.console.print("Available types: oai, claude, llama, litellm")
         elif command == 'codewalk':
-            self.run_codewalk()
+            if args:
+                # Use the provided subdirectory as the starting point
+                subdirectory = args[0]
+                self.run_codewalk(subdirectory)
+            else:
+                # Use current directory as the starting point
+                self.run_codewalk()
         else:
             self.console.print(f"[red]Unknown command: /{command}[/red]")
             self.console.print("Type /help for available commands.")
         
         return True
     
-    def run_codewalk(self):
+    def set_model(self, model_type: str):
+        """Set the LLM model type."""
+        valid_models = ["oai", "claude", "llama", "litellm"]
+        
+        if model_type.lower() not in valid_models:
+            self.console.print(f"[red]Error: Invalid model type '{model_type}'[/red]")
+            self.console.print(f"Valid models: {', '.join(valid_models)}")
+            return
+        
+        try:
+            router = llm_router()
+            current_model = router.get_current_model_name()
+            
+            # Set the new model using the router
+            router.set_model(model_type)
+            new_model = router.get_current_model_name()
+            
+            # Show success message
+            if current_model != new_model:
+                self.console.print(f"[green]✓ Switched from {current_model} to {new_model}[/green]")
+            else:
+                self.console.print(f"[yellow]Already using {new_model}[/yellow]")
+                
+        except Exception as e:
+            self.console.print(f"[red]Error switching to {model_type}: {str(e)}[/red]")
+            self.console.print("Make sure you have the required API keys configured.")
+    
+    def run_codewalk(self, subdirectory: str = None):
+        """Run codewalk on the specified directory or current directory if none specified."""
+        import os
+        
+        if subdirectory:
+            # Use the full path including the subdirectory as the starting point
+            code_base_path = os.path.abspath(subdirectory)
+            if not os.path.exists(code_base_path):
+                self.console.print(f"[red]Directory not found: {code_base_path}[/red]")
+                return
+            if not os.path.isdir(code_base_path):
+                self.console.print(f"[red]Path is not a directory: {code_base_path}[/red]")
+                return
+            
+            self.console.print(f"[dim]Starting codewalk from: {code_base_path}[/dim]")
+        else:
+            # Use current directory as the starting point
+            code_base_path = os.getcwd()
+            self.console.print(f"[dim]Starting codewalk from current directory: {code_base_path}[/dim]")
+        
         with self.console.status("[bold green]Walking through the code ...", spinner="dots") as status:
             console_logger.set_status(status)
-            code_walker.run_codewalk()
+            code_walker.run_codewalk(code_base_path=code_base_path)
     
     def process_query(self, query: str):
         """Process a user query through the CodeWalker."""

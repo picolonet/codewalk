@@ -41,6 +41,18 @@ class LlmResponse(BaseModel):
     usage: Dict[str, Any]
     latency_seconds: Optional[float] = None
 
+    def get_latency_seconds(self) -> float:
+        return self.latency_seconds
+    
+    def get_prompt_tokens(self) -> int:
+        return self.usage.get("prompt_tokens", 0)
+    
+    def get_completion_tokens(self) -> int:
+        return self.usage.get("completion_tokens", 0)
+
+    def get_total_tokens(self) -> int:
+        return self.usage.get("total_tokens", 0)
+
 
 def format_messages(messages: List[Message]) -> List[Dict[str, Any]]:
     """ Formats a list of messages for console output. """
@@ -133,6 +145,10 @@ class LlmModel(ABC):
         json_str = json.dumps(response_dict, indent=2)
         console_logger.log_json(response_dict, title="LLM Response", type = "from_llm")
         #console.print(Panel(json_str, title="LLM Response", border_style="green"))
+
+    @abstractmethod
+    def model_name(self) -> str:
+        pass
 
     @abstractmethod
     def complete(self, messages: List[Message], tools: Optional[List[Dict[str, Any]]] = None,

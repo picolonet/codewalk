@@ -1,10 +1,12 @@
 from typing import Dict, Any, List, Optional, Callable
+from cw.util.data_logger import get_data_logger
 from llm.llm_model import LlmModel, Message, ToolCall, ToolCallResponse, format_messages
 import json
 import inspect
 from pydantic import BaseModel
 from util.livepanel import LivePanel
 from console_logger import console_logger
+from llm.llm_router import llm_router
 
 import os
 
@@ -24,8 +26,7 @@ class CompletionResult(BaseModel):
 class ToolCaller:
     """Handles tool registration and execution for LLM interactions."""
     
-    def __init__(self, llm_model: LlmModel):
-        self.llm_model = llm_model
+    def __init__(self):
         self.tools: Dict[str, Dict[str, Any]] = {}
         self.tool_functions: Dict[str, Callable] = {}
 
@@ -131,6 +132,8 @@ class ToolCaller:
     def complete_with_tools(self, messages: List[Message], tool_choice: Optional[str] = "auto",
                            max_iterations: int = 5) -> List[Message]:
         """Complete a conversation with automatic tool execution."""
+
+        self.llm_model = llm_router().get()
         conversation = messages.copy()
         
         for iteration in range(max_iterations):
@@ -171,6 +174,8 @@ class ToolCaller:
                            max_iterations: int = 50 ) -> CompletionResult:
         """Complete a conversation with automatic tool execution."""
 
+        self.llm_model = llm_router().get()
+
         # Debug live panel to print each round of messages
         # self.start_debugpanel()
         # self.post_debugpanel("New Query:", messages=messages)
@@ -179,12 +184,16 @@ class ToolCaller:
         full_conversation = messages.copy()
         current_result: List[Message] = []
         has_tool_calls = False    
+        data_logger = get_data_logger()
         
         for iteration in range(max_iterations):
             # Get response from LLM
             last_response = self.llm_model.complete(messages=full_conversation, tools=self.get_tool_schemas(),
                 tool_choice=tool_choice)
             print(f"Latency (sec) = {last_response.latency_seconds}")
+            data_logger.log_stats(self.llm_model.model_name(), prompt_tokens=last_response.get_prompt_tokens(),
+                 completion_tokens=last_response.get_completion_tokens(), latency_seconds=last_response.get_latency_seconds(),
+                  operation="tool_call" if has_tool_calls else "completion")
             
             # Add assistant message to conversation
             assistant_message = Message(

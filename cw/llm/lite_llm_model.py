@@ -8,6 +8,7 @@ import time
 import asyncio
 from dotenv import load_dotenv
 from console_logger import console_logger
+from util.data_logger import get_data_logger
 from llm.llm_model import LlmModel, Message, LlmResponse, ToolCall, ToolCallResponse
 
 
@@ -25,6 +26,8 @@ class LiteLlmModel(LlmModel):
         if base_url:
             litellm.api_base = base_url
 
+    def model_name(self) -> str:
+        return "lite_llm"
 
     def complete(self, messages: List[Message], tools: Optional[List[Dict[str, Any]]] = None,
         tool_choice: Optional[Union[str, Dict[str, Any]]] = None, **kwargs) -> LlmResponse:
@@ -107,6 +110,10 @@ class LiteLlmModel(LlmModel):
             latency_seconds=latency
         )
         self._debug_print_llm_response(final_response)
+        data_logger = get_data_logger()
+        data_logger.log_stats(self.model_name(), prompt_tokens=final_response.get_prompt_tokens(),
+                 completion_tokens=final_response.get_completion_tokens(), latency_seconds=final_response.get_latency_seconds(),
+                  operation="tool_call" if tool_calls != None else "completion")
         return final_response
 
     def stream_complete(self, messages: List[Message], tools: Optional[List[Dict[str, Any]]] = None,

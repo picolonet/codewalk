@@ -1,7 +1,7 @@
 import os
 import fnmatch
+from llm.llm_router import llm_router
 from llm.llm_model import Message
-from llm.lite_llm_model import LiteLlmModel, lite_llm
 from tool_caller import ToolCaller, get_file_contents, list_directory, search_files
 from console_logger import console_logger
 from cw_prompts import cw_analyze_file_prompt
@@ -11,7 +11,7 @@ CODEWALKER_KB_PREFIX=".cw_kb/"
 class CodeWalker:
     def __init__(self, code_base_path: str):
         self.code_base_path = code_base_path
-        self.tool_caller = ToolCaller(lite_llm)
+        self.tool_caller = ToolCaller()
         self.tool_caller.register_tool_from_function(get_file_contents)
         self.tool_caller.register_tool_from_function(list_directory)
         self.tool_caller.register_tool_from_function(search_files)
@@ -59,31 +59,39 @@ class CodeWalker:
     
     def _generate_file_summary(self, file_path: str) -> str:
         """Generate a summary of the file using LLM."""
+        llm_model = llm_router().get()
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 file_content = f.read()
-        except (UnicodeDecodeError, IOError):
-            return f"Unable to process file {file_path} - binary or unreadable file"
+        except (UnicodeDecodeError, IOError) as e:
+            err = f"Unable to process file {file_path} - binary or unreadable file"
+            print(err)
+            print(f"Exception: {e}")
+            return err
         
         prompt = cw_analyze_file_prompt(file_path, file_content)
-        print(prompt)
+        #print("final prompt:", prompt)
 
         try:
-            response = lite_llm.complete([Message(role="user", content=prompt)])
+            response = llm_model.complete([Message(role="user", content=prompt)])
             return response.content or "Failed to generate summary"
         except Exception as e:
             return f"Error generating summary for {file_path}: {str(e)}"
     
-    def run_codewalk(self, kb_basedir=None):
+    def run_codewalk(self, kb_basedir=None, code_base_path=None):
         """Run a code walk, file by file, building the knowledge base."""
         if kb_basedir is None:
             kb_basedir = os.path.join(self.code_base_path, CODEWALKER_KB_PREFIX.rstrip('/'))
         
         # Ensure kb_basedir exists
         os.makedirs(kb_basedir, exist_ok=True)
-        
+
         # Load ignore patterns
         ignore_patterns = self._load_ignore_patterns(self.code_base_path)
+        
+        if code_base_path:
+            self.code_base_path = code_base_path
+    
         
         # Walk through the directory structure
         for root, dirs, files in os.walk(self.code_base_path):

@@ -167,6 +167,7 @@ class GroqLlamaProvider(LlamaProvider):
                 "total_tokens": response.usage.total_tokens
             }
         
+        
         return LlmResponse(
             content=content,
             tool_calls=tool_calls if tool_calls else None,

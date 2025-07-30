@@ -8,7 +8,7 @@ import anthropic
 from anthropic import Anthropic, AsyncAnthropic
 from anthropic.types import Message as AnthropicMessage, MessageParam
 
-from llm_model import LlmModel, Message, LlmResponse, ToolCall
+from llm.llm_model import LlmModel, Message, LlmResponse, ToolCall
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
@@ -148,6 +148,9 @@ class AnthropicModel(LlmModel):
             usage=usage,
             latency_seconds=latency
         )
+    
+    def model_name(self) -> str:
+        return "claude"
 
     def complete(self, messages: List[Message], tools: Optional[List[Dict[str, Any]]] = None,
                 tool_choice: Optional[Union[str, Dict[str, Any]]] = None, **kwargs) -> LlmResponse:
@@ -185,7 +188,8 @@ class AnthropicModel(LlmModel):
             return llm_response
             
         except Exception as e:
-            console_logger.log(f"Error in Anthropic completion: {str(e)}", "error")
+            #console_logger.log(f"Error in Anthropic completion: {str(e)}", "error")
+            print(f"Error in Anthropic completion: {str(e)}", "error")
             raise
 
     async def async_complete(self, messages: List[Message], tools: Optional[List[Dict[str, Any]]] = None,

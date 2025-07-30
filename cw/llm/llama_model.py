@@ -4,6 +4,8 @@ import asyncio
 import os
 from dotenv import load_dotenv
 
+from util.data_logger import get_data_logger
+
 from .llm_model import LlmModel, Message, LlmResponse, ToolCall
 from .llama_provider import LlamaProvider, GroqLlamaProvider, create_groq_llama_provider
 from console_logger import console_logger
@@ -59,6 +61,10 @@ class LlamaModel(LlmModel):
         else:
             raise ValueError(f"Unknown provider type: {provider_type}")
 
+
+    def model_name(self) -> str:
+        return "llama"
+
     def complete(self, messages: List[Message], tools: Optional[List[Dict[str, Any]]] = None,
                 tool_choice: Optional[Union[str, Dict[str, Any]]] = None, **kwargs) -> LlmResponse:
         """Synchronous completion using the configured provider."""
@@ -67,6 +73,10 @@ class LlamaModel(LlmModel):
             
             # Debug logging
             self._debug_print_llm_response(response)
+            data_logger = get_data_logger()
+            data_logger.log_stats(self.model_name(), prompt_tokens=response.get_prompt_tokens(),
+                 completion_tokens=response.get_completion_tokens(), latency_seconds=response.get_latency_seconds(),
+                  operation="tool_call" if tools != None else "completion")
             
             return response
             

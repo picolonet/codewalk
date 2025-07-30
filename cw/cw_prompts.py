@@ -2,8 +2,7 @@
 
 
 def cw_analyze_file_prompt(file_path, file_content):
-    return 
-    f"""
+    return f"""
 Analyze the following code file and provide a comprehensive summary:
 
 File: {file_path}

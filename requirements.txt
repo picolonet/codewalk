@@ -5,3 +5,5 @@ python-dotenv
 anthropic
 openai
 groq
+matplotlib
+seaborn
