@@ -1,0 +1,4 @@
+pydantic
+litellm
+rich
+python-dotenv
