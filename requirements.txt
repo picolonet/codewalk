@@ -2,3 +2,6 @@ pydantic
 litellm
 rich
 python-dotenv
+anthropic
+openai
+groq

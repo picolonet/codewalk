@@ -29,19 +29,6 @@ class ToolCaller:
         self.tools: Dict[str, Dict[str, Any]] = {}
         self.tool_functions: Dict[str, Callable] = {}
 
-    # def start_debugpanel(self):
-    #     self.debug_panel = LivePanel("Debug messages")
-    #     self.debug_panel.start()
-
-    # def post_debugpanel(self, title: str, messages: List[Message]):
-    #     formatted_message = format_messages(messages)
-    #     self.post_debugpanel_formatted(title, formatted_message)
-
-    # def post_debugpanel_formatted(self, title: str, message: str):
-    #     self.debug_panel.add_message(f"{title}\n {message}")
-
-    # def stop_debugpanel(self):
-    #     self.debug_panel.stop()
     
     def post_json(self, title:str, messages: List[Message], type: str):
         # Convert Pydantic models to dicts for JSON rendering

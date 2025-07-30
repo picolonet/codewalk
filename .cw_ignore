@@ -1,2 +1,7 @@
-node_modules/
+node_modules/*
 *.gif
+.venv_1/*
+.cw_ignore
+.git/*
+.gitignore
+.env

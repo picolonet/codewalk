@@ -1,6 +1,7 @@
 import os
 import fnmatch
-from llm.llm_model import lite_llm, Message
+from llm.llm_model import Message
+from llm.lite_llm_model import LiteLlmModel, lite_llm
 from tool_caller import ToolCaller, get_file_contents, list_directory, search_files
 from console_logger import console_logger
 from cw_prompts import cw_analyze_file_prompt
@@ -65,6 +66,7 @@ class CodeWalker:
             return f"Unable to process file {file_path} - binary or unreadable file"
         
         prompt = cw_analyze_file_prompt(file_path, file_content)
+        print(prompt)
 
         try:
             response = lite_llm.complete([Message(role="user", content=prompt)])

@@ -1,13 +1,14 @@
 from typing import List, Optional, Dict, Any, Union
 import litellm
-from litellm import completion
+from litellm import completion, acompletion
 from litellm.types.utils import ModelResponse
 from litellm.types.utils import StreamingChoices
 import os
 import time
+import asyncio
 from dotenv import load_dotenv
 from console_logger import console_logger
-from llm_model import LlmModel, Message, LlmResponse, ToolCall
+from llm.llm_model import LlmModel, Message, LlmResponse, ToolCall, ToolCallResponse
 
 
 class LiteLlmModel(LlmModel):
@@ -138,6 +139,73 @@ class LiteLlmModel(LlmModel):
         # Full latency would need to be measured by the caller as chunks arrive
         return stream
 
+    async def async_complete(self, messages: List[Message], tools: Optional[List[Dict[str, Any]]] = None,
+        tool_choice: Optional[Union[str, Dict[str, Any]]] = None, **kwargs) -> LlmResponse:
+        """Async version of complete method for parallel processing."""
+        
+        formatted_messages = self._format_messages(messages)
+        
+        completion_kwargs = {
+            "model": self.model,
+            "messages": formatted_messages,
+            "temperature": self.temperature,
+            "stream": False,
+            **kwargs
+        }
+        
+        if self.max_tokens:
+            completion_kwargs["max_tokens"] = self.max_tokens
+        
+        if tools:
+            completion_kwargs["tools"] = tools
+        
+        if tool_choice:
+            completion_kwargs["tool_choice"] = tool_choice
+        
+        # Measure latency
+        start_time = time.time()
+        response = await acompletion(**completion_kwargs)
+        end_time = time.time()
+        latency = end_time - start_time
+        
+        # Guard: ensure response is a ModelResponse (not a streaming object)
+        if not isinstance(response, ModelResponse):
+            raise RuntimeError(f"Expected ModelResponse from acompletion(), got {type(response)}.\n"
+                               "This usually means a streaming object was returned.\n"
+                               "Ensure 'stream' is False.")
+        
+        choice = response.choices[0]
+        if isinstance(choice, StreamingChoices):
+            raise RuntimeError("Received a StreamingChoices object in non-streaming mode. This should not happen.")
+        message = choice.message
+        
+        tool_calls = None
+        if hasattr(message, 'tool_calls') and message.tool_calls:
+            tool_calls = []
+            for tc in message.tool_calls:
+                func = tc.function
+                if hasattr(func, 'model_dump'):
+                    func = func.model_dump()
+                elif hasattr(func, 'dict'):
+                    func = func.dict()
+                if not isinstance(func, dict):
+                    func = {}
+                tool_calls.append(ToolCall(id=tc.id, type=tc.type, function=func))
+        
+        usage = getattr(response, 'usage', {}) if hasattr(response, 'usage') else {}
+        if not isinstance(usage, dict) and hasattr(usage, 'model_dump'):
+            usage = usage.model_dump()
+        finish_reason = choice.finish_reason if choice.finish_reason is not None else 'stop'
+        final_response = LlmResponse(
+            content=message.content,
+            tool_calls=tool_calls,
+            finish_reason=finish_reason,
+            usage=usage,
+            latency_seconds=latency
+        )
+        self._debug_print_llm_response(final_response)
+        return final_response
+
 
 # Instantiate singleton global
 
@@ -147,7 +215,7 @@ api_key = os.environ.get("CODEWALKER_API_KEY")
 base_url = os.environ.get("CODEWALKER_BASE_URL")
 model_name = os.environ.get("CODEWALKER_MODEL_NAME") or "gpt-3.5-turbo"
 
-lite_llm = LlmModel(
+lite_llm = LiteLlmModel(
     model=model_name,
     base_url=base_url,
     api_key=api_key,  # Or set OPENAI_API_KEY environment variable
