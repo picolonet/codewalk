@@ -8,10 +8,9 @@ import json
 from litellm.types.utils import ModelResponse
 from litellm.types.utils import StreamingChoices
 import os
+import time
 from dotenv import load_dotenv
-
-
-
+from console_logger import console_logger
 
 
 class ToolCall(BaseModel):
@@ -38,9 +37,10 @@ class LlmResponse(BaseModel):
     tool_calls: Optional[List[ToolCall]] = None
     finish_reason: str
     usage: Dict[str, Any]
+    latency_seconds: Optional[float] = None
 
 
-def format_messages(self, messages: List[Message]) -> List[Dict[str, Any]]:
+def format_messages(messages: List[Message]) -> List[Dict[str, Any]]:
     """ Formats a list of messages for console output. """
     formatted_messages = []
     for msg in messages:
@@ -117,7 +117,32 @@ class LlmModel:
             json_str = json.dumps(msg, indent=2)
             console.print(Panel(json_str, title=title, border_style="blue"))
 
-
+    def _debug_print_llm_response(self, llm_response: LlmResponse):
+        """Pretty prints LLM response for debugging using rich."""
+        console = Console()
+        
+        # Create a dictionary representation of the response
+        response_dict = {
+            "content": llm_response.content,
+            "finish_reason": llm_response.finish_reason,
+            "usage": llm_response.usage,
+            "latency_seconds": llm_response.latency_seconds
+        }
+        
+        if llm_response.tool_calls:
+            response_dict["tool_calls"] = [
+                {
+                    "id": tc.id,
+                    "type": tc.type,
+                    "function": tc.function
+                }
+                for tc in llm_response.tool_calls
+            ]
+            
+        # Print as formatted JSON
+        json_str = json.dumps(response_dict, indent=2)
+        console_logger.log_json(response_dict, title="LLM Response", type = "from_llm")
+        #console.print(Panel(json_str, title="LLM Response", border_style="green"))
 
     def complete(self, messages: List[Message], tools: Optional[List[Dict[str, Any]]] = None,
         tool_choice: Optional[Union[str, Dict[str, Any]]] = None, **kwargs) -> LlmResponse:
@@ -138,7 +163,8 @@ class LlmModel:
         """
 
         formatted_messages = self._format_messages(messages)
-        self._debug_print_formatted_messages(formatted_messages)
+        # self._debug_print_formatted_messages(formatted_messages)
+        
         
         completion_kwargs = {
             "model": self.model,
@@ -157,7 +183,12 @@ class LlmModel:
         if tool_choice:
             completion_kwargs["tool_choice"] = tool_choice
         
+        # Measure latency
+        start_time = time.time()
         response = completion(**completion_kwargs)
+        end_time = time.time()
+        latency = end_time - start_time
+        
         # Guard: ensure response is a ModelResponse (not a streaming object)
         if not isinstance(response, ModelResponse):
             raise RuntimeError(f"Expected ModelResponse from completion(), got {type(response)}.\n"
@@ -186,12 +217,15 @@ class LlmModel:
         if not isinstance(usage, dict) and hasattr(usage, 'model_dump'):
             usage = usage.model_dump()
         finish_reason = choice.finish_reason if choice.finish_reason is not None else 'stop'
-        return LlmResponse(
+        final_response = LlmResponse(
             content=message.content,
             tool_calls=tool_calls,
             finish_reason=finish_reason,
-            usage=usage
+            usage=usage,
+            latency_seconds=latency
         )
+        self._debug_print_llm_response(final_response)
+        return final_response
 
     def stream_complete(self, messages: List[Message], tools: Optional[List[Dict[str, Any]]] = None,
         tool_choice: Optional[Union[str, Dict[str, Any]]] = None,
@@ -216,7 +250,12 @@ class LlmModel:
         if tool_choice:
             completion_kwargs["tool_choice"] = tool_choice
         
-        return completion(**completion_kwargs)
+        # Measure initial connection latency for streaming
+        start_time = time.time()
+        stream = completion(**completion_kwargs)
+        # Note: For streaming, this only measures the initial connection time
+        # Full latency would need to be measured by the caller as chunks arrive
+        return stream
 
 
 # Example usage of the above class
@@ -299,6 +338,7 @@ if __name__ == "__main__":
         print("Response content:", response.content)
         print("Finish reason:", response.finish_reason)
         print("Usage:", response.usage)
+        print("Latency:", f"{response.latency_seconds:.3f}s" if response.latency_seconds else "Not measured")
         
         # Check if model made tool calls
         if response.tool_calls:
@@ -350,6 +390,7 @@ if __name__ == "__main__":
             print(f"\nFinal response after tool execution:")
             print(f"Content: {final_response.content}")
             print(f"Finish reason: {final_response.finish_reason}")
+            print(f"Latency: {final_response.latency_seconds:.3f}s" if final_response.latency_seconds else "Not measured")
         
     except Exception as e:
         print(f"Error: {e}")

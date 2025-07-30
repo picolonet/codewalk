@@ -3,7 +3,8 @@ from llm_model import LlmModel, LlmResponse, Message, ToolCall, ToolCallResponse
 import json
 import inspect
 from pydantic import BaseModel
-from cli import cli
+from util.livepanel import LivePanel
+from console_logger import console_logger
 
 import os
 
@@ -18,6 +19,7 @@ class CompletionResult(BaseModel):
     has_tool_calls: bool
     full_conversation: List[Message]
     current_result: List[Message]
+    last_response: Message # The final message
 
 class ToolCaller:
     """Handles tool registration and execution for LLM interactions."""
@@ -26,6 +28,26 @@ class ToolCaller:
         self.llm_model = llm_model
         self.tools: Dict[str, Dict[str, Any]] = {}
         self.tool_functions: Dict[str, Callable] = {}
+
+    # def start_debugpanel(self):
+    #     self.debug_panel = LivePanel("Debug messages")
+    #     self.debug_panel.start()
+
+    # def post_debugpanel(self, title: str, messages: List[Message]):
+    #     formatted_message = format_messages(messages)
+    #     self.post_debugpanel_formatted(title, formatted_message)
+
+    # def post_debugpanel_formatted(self, title: str, message: str):
+    #     self.debug_panel.add_message(f"{title}\n {message}")
+
+    # def stop_debugpanel(self):
+    #     self.debug_panel.stop()
+    
+    def post_json(self, title:str, messages: List[Message], type: str):
+        # Convert Pydantic models to dicts for JSON rendering
+        message_dicts = [m.model_dump(exclude_none=True) for m in messages]
+        console_logger.log_json(message_dicts, title=title, type=type)
+
     
     def register_tool(self, name: str, description: str, parameters: Dict[str, Any], 
                      function: Callable) -> None:
@@ -159,12 +181,13 @@ class ToolCaller:
         return conversation
 
     def full_completion_with_tools(self, messages: List[Message], tool_choice: Optional[str] = "auto",
-                           max_iterations: int = 5 ) -> CompletionResult:
+                           max_iterations: int = 50 ) -> CompletionResult:
         """Complete a conversation with automatic tool execution."""
 
         # Debug live panel to print each round of messages
-        cli.start_debugpanel()
-        cli.post_debugpanel("New Query:", messages=messages)
+        # self.start_debugpanel()
+        # self.post_debugpanel("New Query:", messages=messages)
+        self.post_json("New Query", messages=messages, type="user")
 
         full_conversation = messages.copy()
         current_result: List[Message] = []
@@ -174,6 +197,7 @@ class ToolCaller:
             # Get response from LLM
             last_response = self.llm_model.complete(messages=full_conversation, tools=self.get_tool_schemas(),
                 tool_choice=tool_choice)
+            print(f"Latency (sec) = {last_response.latency_seconds}")
             
             # Add assistant message to conversation
             assistant_message = Message(
@@ -182,8 +206,8 @@ class ToolCaller:
                 tool_calls = last_response.tool_calls
             )
 
-            # Post to debug panel
-            cli.post_debugpanel("Response from LLM:", [assistant_message])
+            # Post to log message
+            self.post_json("Response from LLM:", [assistant_message], type="from_llm")
 
             full_conversation.append(assistant_message)
             current_result.append(assistant_message)
@@ -204,13 +228,14 @@ class ToolCaller:
                     content=tool_response.content,
                     tool_call_id=tool_response.tool_call_id
                 )
-                # Debug panel: Tool call
-                cli.post_debugpanel("Tool call output to LLM:", [tool_message])
+                # log message: Tool call
+                self.post_json("Tool call output to LLM:", [tool_message], type = "to_llm")
                 full_conversation.append(tool_message)
                 current_result.append(tool_message)
         
-        cli.stop_debugpanel()
-        return CompletionResult(has_tool_calls=has_tool_calls, full_conversation=full_conversation, current_result=current_result)
+        # self.stop_debugpanel()
+        return CompletionResult(has_tool_calls=has_tool_calls, full_conversation=full_conversation,
+                                 current_result=current_result, last_response=assistant_message)
 
 
 

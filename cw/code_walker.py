@@ -1,6 +1,10 @@
+import os
+import fnmatch
 from llm_model import llm, Message
 from tool_caller import ToolCaller, get_file_contents, list_directory, search_files
+from console_logger import console_logger
 
+CODEWALKER_KB_PREFIX=".cw_kb/"
 
 class CodeWalker:
     def __init__(self, code_base_path: str):
@@ -12,8 +16,130 @@ class CodeWalker:
 
     def run_query(self, query: str):
         return self.tool_caller.full_completion_with_tools(messages=[Message(role="user", content=query)])
-
+    
+    def _load_ignore_patterns(self, root_path: str):
+        """Load ignore patterns from .cw_ignore file."""
+        ignore_file = os.path.join(root_path, '.cw_ignore')
+        ignore_patterns = []
         
+        if os.path.exists(ignore_file):
+            with open(ignore_file, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#'):
+                        ignore_patterns.append(line)
+        
+        # Always ignore the .cw_kb directory itself
+        ignore_patterns.append('.cw_kb')
+        ignore_patterns.append('.cw_kb/*')
+        ignore_patterns.append('.cw_ignore')
+        
+        return ignore_patterns
+    
+    def _should_ignore(self, path: str, ignore_patterns: list) -> bool:
+        """Check if a path should be ignored based on patterns."""
+        rel_path = os.path.relpath(path, self.code_base_path)
+        
+        for pattern in ignore_patterns:
+            if fnmatch.fnmatch(rel_path, pattern) or fnmatch.fnmatch(os.path.basename(path), pattern):
+                return True
+        return False
+    
+    def _create_kb_directory(self, source_path: str, kb_root: str):
+        """Create corresponding directory structure in kb_root."""
+        rel_path = os.path.relpath(source_path, self.code_base_path)
+        kb_path = os.path.join(kb_root, rel_path)
+        
+        if not os.path.exists(kb_path):
+            os.makedirs(kb_path, exist_ok=True)
+        
+        return kb_path
+    
+    def _generate_file_summary(self, file_path: str) -> str:
+        """Generate a summary of the file using LLM."""
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                file_content = f.read()
+        except (UnicodeDecodeError, IOError):
+            return f"Unable to process file {file_path} - binary or unreadable file"
+        
+        prompt = f"""Analyze the following code file and provide a comprehensive summary:
 
+File: {file_path}
+
+Please document:
+1. The file's main purpose and functionality
+2. Key functions, classes, or components defined
+3. Dependencies on other modules in the project (imports, requires, includes)
+4. Any important patterns, algorithms, or design decisions
+5. Public APIs or interfaces exposed
+
+Code content:
+```
+{file_content}
+```
+
+Provide a clear, structured summary that would help developers understand this file's role in the project."""
+
+        try:
+            response = llm.complete([Message(role="user", content=prompt)])
+            return response.content or "Failed to generate summary"
+        except Exception as e:
+            return f"Error generating summary for {file_path}: {str(e)}"
+    
+    def run_codewalk(self, kb_basedir=None):
+        """Run a code walk, file by file, building the knowledge base."""
+        if kb_basedir is None:
+            kb_basedir = os.path.join(self.code_base_path, CODEWALKER_KB_PREFIX.rstrip('/'))
+        
+        # Ensure kb_basedir exists
+        os.makedirs(kb_basedir, exist_ok=True)
+        
+        # Load ignore patterns
+        ignore_patterns = self._load_ignore_patterns(self.code_base_path)
+        
+        # Walk through the directory structure
+        for root, dirs, files in os.walk(self.code_base_path):
+            # Filter out ignored directories
+            dirs[:] = [d for d in dirs if not self._should_ignore(os.path.join(root, d), ignore_patterns)]
+            
+            # Skip if current directory should be ignored
+            if self._should_ignore(root, ignore_patterns):
+                continue
+            
+            # Create corresponding directory in kb structure
+            kb_dir = self._create_kb_directory(root, kb_basedir)
+            
+            # Process each file
+            for file in files:
+                file_path = os.path.join(root, file)
+                
+                # Skip ignored files
+                if self._should_ignore(file_path, ignore_patterns):
+                    continue
+                
+                print(f"Processing: {file_path}")
+                console_logger.update_status(file)
+                
+                # Generate summary using LLM
+                summary = self._generate_file_summary(file_path)
+                
+                # Create output filename
+                base_name = os.path.splitext(file)[0]
+                kb_filename = f"{base_name}_codewalk.kb"
+                kb_file_path = os.path.join(kb_dir, kb_filename)
+                
+                # Write summary to kb file
+                with open(kb_file_path, 'w', encoding='utf-8') as f:
+                    f.write(f"# CodeWalk Summary for {file_path}\n\n")
+                    f.write(f"Original file: {file_path}\n")
+                    f.write(f"Generated on: {os.path.getctime(file_path)}\n\n")
+                    f.write("## Summary\n\n")
+                    f.write(summary)
+                
+                print(f"Created: {kb_file_path}")
+        
+        print(f"CodeWalk completed. Knowledge base created in: {kb_basedir}")
+        
 
 code_walker = CodeWalker(code_base_path=".")
