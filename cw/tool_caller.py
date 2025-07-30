@@ -1,5 +1,5 @@
 from typing import Dict, Any, List, Optional, Callable
-from llm_model import LlmModel, LlmResponse, Message, ToolCall, ToolCallResponse, format_messages
+from llm.llm_model import LlmModel, Message, ToolCall, ToolCallResponse, format_messages
 import json
 import inspect
 from pydantic import BaseModel

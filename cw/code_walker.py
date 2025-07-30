@@ -1,15 +1,16 @@
 import os
 import fnmatch
-from llm_model import llm, Message
+from llm.llm_model import lite_llm, Message
 from tool_caller import ToolCaller, get_file_contents, list_directory, search_files
 from console_logger import console_logger
+from cw_prompts import cw_analyze_file_prompt
 
 CODEWALKER_KB_PREFIX=".cw_kb/"
 
 class CodeWalker:
     def __init__(self, code_base_path: str):
         self.code_base_path = code_base_path
-        self.tool_caller = ToolCaller(llm)
+        self.tool_caller = ToolCaller(lite_llm)
         self.tool_caller.register_tool_from_function(get_file_contents)
         self.tool_caller.register_tool_from_function(list_directory)
         self.tool_caller.register_tool_from_function(search_files)
@@ -63,26 +64,10 @@ class CodeWalker:
         except (UnicodeDecodeError, IOError):
             return f"Unable to process file {file_path} - binary or unreadable file"
         
-        prompt = f"""Analyze the following code file and provide a comprehensive summary:
-
-File: {file_path}
-
-Please document:
-1. The file's main purpose and functionality
-2. Key functions, classes, or components defined
-3. Dependencies on other modules in the project (imports, requires, includes)
-4. Any important patterns, algorithms, or design decisions
-5. Public APIs or interfaces exposed
-
-Code content:
-```
-{file_content}
-```
-
-Provide a clear, structured summary that would help developers understand this file's role in the project."""
+        prompt = cw_analyze_file_prompt(file_path, file_content)
 
         try:
-            response = llm.complete([Message(role="user", content=prompt)])
+            response = lite_llm.complete([Message(role="user", content=prompt)])
             return response.content or "Failed to generate summary"
         except Exception as e:
             return f"Error generating summary for {file_path}: {str(e)}"

@@ -37,3 +37,22 @@ File content:
 
 Provide a clear, structured summary that would help developers understand this file's role in the project.
 """
+
+def cw_analyze_v0(file_path, file_content):
+    return f"""Analyze the following code file and provide a comprehensive summary:
+
+File: {file_path}
+
+Please document:
+1. The file's main purpose and functionality
+2. Key functions, classes, or components defined
+3. Dependencies on other modules in the project (imports, requires, includes)
+4. Any important patterns, algorithms, or design decisions
+5. Public APIs or interfaces exposed
+
+Code content:
+```
+{file_content}
+```
+
+Provide a clear, structured summary that would help developers understand this file's role in the project."""
