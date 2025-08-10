@@ -7,3 +7,4 @@ openai
 groq
 matplotlib
 seaborn
+langfuse

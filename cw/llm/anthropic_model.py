@@ -29,6 +29,7 @@ class AnthropicModel(LlmModel):
             temperature: Sampling temperature (0.0 to 1.0)
             max_tokens: Maximum tokens to generate
         """
+        super().__init__(model)
         self.model = model
         self.temperature = temperature
         self.max_tokens = max_tokens or 4096
@@ -157,6 +158,14 @@ class AnthropicModel(LlmModel):
         """Synchronous completion using Anthropic Claude."""
         start_time = time.time()
         
+        # Create trace for this completion
+        trace = self._create_trace("anthropic_completion")
+        formatted_messages = self._format_messages(messages)
+        generation = self._trace_generation(
+            trace, "anthropic_generate", self.model, formatted_messages, 
+            self.temperature, self.max_tokens, tools, tool_choice
+        )
+        
         try:
             system_message, anthropic_messages = self._convert_messages_to_anthropic(messages)
             anthropic_tools = self._convert_tools_to_anthropic(tools)
@@ -182,6 +191,13 @@ class AnthropicModel(LlmModel):
             latency = time.time() - start_time
             llm_response = self._convert_anthropic_response(response, latency)
             
+            # End trace with results
+            self._trace_end(
+                trace, generation, llm_response.content or "",
+                llm_response.get_prompt_tokens(), llm_response.get_completion_tokens(),
+                llm_response.get_total_tokens()
+            )
+            
             # Debug logging
             self._debug_print_llm_response(llm_response)
             
@@ -196,6 +212,14 @@ class AnthropicModel(LlmModel):
                            tool_choice: Optional[Union[str, Dict[str, Any]]] = None, **kwargs) -> LlmResponse:
         """Async completion using Anthropic Claude."""
         start_time = time.time()
+        
+        # Create trace for this completion
+        trace = self._create_trace("anthropic_async_completion")
+        formatted_messages = self._format_messages(messages)
+        generation = self._trace_generation(
+            trace, "anthropic_async_generate", self.model, formatted_messages, 
+            self.temperature, self.max_tokens, tools, tool_choice
+        )
         
         try:
             system_message, anthropic_messages = self._convert_messages_to_anthropic(messages)
@@ -221,6 +245,13 @@ class AnthropicModel(LlmModel):
             
             latency = time.time() - start_time
             llm_response = self._convert_anthropic_response(response, latency)
+            
+            # End trace with results
+            self._trace_end(
+                trace, generation, llm_response.content or "",
+                llm_response.get_prompt_tokens(), llm_response.get_completion_tokens(),
+                llm_response.get_total_tokens()
+            )
             
             # Debug logging
             self._debug_print_llm_response(llm_response)

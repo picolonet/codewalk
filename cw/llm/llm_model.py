@@ -1,3 +1,4 @@
+from trace import Trace
 from typing import List, Optional, Dict, Any, Union
 from abc import ABC, abstractmethod
 import asyncio
@@ -13,6 +14,7 @@ import os
 import time
 from dotenv import load_dotenv
 from console_logger import console_logger
+from langfuse import Langfuse
 
 
 class ToolCall(BaseModel):
@@ -32,6 +34,23 @@ class Message(BaseModel):
     content: Optional[str] = None
     tool_calls: Optional[List[ToolCall]] = None
     tool_call_id: Optional[str] = None
+  
+    def to_string(self) -> str:
+        """Convert a Message object to a string representation."""
+        result = []
+        if self.content:
+            result.append(self.content)
+        
+        if self.tool_calls:
+            for tool_call in self.tool_calls:
+                result.append(f"Tool Call {tool_call.id}:")
+                result.append(f"Function: {tool_call.function.get('name')}")
+                result.append(f"Arguments: {json.dumps(tool_call.function.get('arguments'), indent=2)}")
+        
+        if self.tool_call_id:
+            result.append(f"Tool Call ID: {self.tool_call_id}")
+            
+        return "\n".join(result)
 
 
 class LlmResponse(BaseModel):
@@ -82,6 +101,11 @@ def format_messages(messages: List[Message]) -> List[Dict[str, Any]]:
 
 
 class LlmModel(ABC):
+    def __init__(self, model_name: str):
+        self.model_name = model_name
+        # Initialize Langfuse for tracing
+        self.langfuse = Langfuse()
+
 
     def _format_messages(self, messages: List[Message]) -> List[Dict[str, Any]]:
         formatted_messages = []
@@ -143,12 +167,44 @@ class LlmModel(ABC):
             
         # Print as formatted JSON
         json_str = json.dumps(response_dict, indent=2)
-        console_logger.log_json(response_dict, title="LLM Response", type = "from_llm")
+        console_logger.log_json_panel(response_dict, title="LLM Response", type = "from_llm")
         #console.print(Panel(json_str, title="LLM Response", border_style="green"))
 
-    @abstractmethod
-    def model_name(self) -> str:
-        pass
+    def _create_trace(self, name: str):
+        """Create a new trace in Langfuse v3."""
+        return self.langfuse.trace(name=name)
+
+    def _trace_generation(self, trace, name: str, model: str, formatted_messages: List[Dict[str, Any]],
+        temperature: float, max_tokens: Optional[int] = None, tools: Optional[List[Dict[str, Any]]] = None, 
+        tool_choice: Optional[Union[str, Dict[str, Any]]] = None):
+        """Create a generation within a trace in Langfuse v3."""
+        generation = trace.generation(
+            name=name,
+            model=model,
+            input=formatted_messages,
+            metadata={
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+                "tools": len(tools) if tools else 0,
+                "tool_choice": tool_choice
+            }
+        )
+        return generation
+
+    def _trace_end(self, generation, output: str, prompt_tokens: int, completion_tokens: int, total_tokens: int):
+        """End a generation in Langfuse v3."""
+        generation.end(
+            output=output,
+            usage={
+                "input": prompt_tokens,
+                "output": completion_tokens,
+                "total": total_tokens
+            }
+        )
+
+
+    def get_model_name(self) -> str:
+        return self.model_name
 
     @abstractmethod
     def complete(self, messages: List[Message], tools: Optional[List[Dict[str, Any]]] = None,

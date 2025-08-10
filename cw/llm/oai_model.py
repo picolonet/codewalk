@@ -33,6 +33,7 @@ class OaiModel(LlmModel):
             max_tokens: Maximum tokens to generate
             base_url: Optional base URL for API calls
         """
+        super().__init__(model)
         self.model = model
         self.temperature = temperature
         self.max_tokens = max_tokens or 4096
@@ -138,13 +139,29 @@ class OaiModel(LlmModel):
         return "oai"
 
     def complete(self, messages: List[Message], tools: Optional[List[Dict[str, Any]]] = None,
-                tool_choice: Optional[Union[str, Dict[str, Any]]] = None, **kwargs) -> LlmResponse:
+                tool_choice: Optional[Union[str, Dict[str, Any]]] = None, trace_name: Optional[str] = None, **kwargs) -> LlmResponse:
         """Synchronous completion using OpenAI models."""
         start_time = time.time()
         
         try:
             openai_messages = self._convert_messages_to_openai(messages)
             openai_tools = self._convert_tools_to_openai(tools)
+            formatted_messages = self._format_messages(messages)
+            
+            # Create Langfuse trace
+            trace = self._create_trace(name=trace_name or "oai_completion")
+            
+            # Create Langfuse generation
+            generation = self._trace_generation(
+                trace=trace, 
+                name="openai_completion",
+                model=self.model, 
+                formatted_messages=formatted_messages,
+                temperature=self.temperature, 
+                max_tokens=self.max_tokens, 
+                tools=tools, 
+                tool_choice=tool_choice
+            )
             
             # Prepare request parameters
             request_params = {
@@ -167,6 +184,16 @@ class OaiModel(LlmModel):
             latency = time.time() - start_time
             llm_response = self._convert_openai_response(response, latency)
             
+            # Update Langfuse trace with results
+            self._trace_end(
+                trace=trace, 
+                generation=generation, 
+                output=llm_response.content or "",
+                prompt_tokens=llm_response.get_prompt_tokens(),
+                completion_tokens=llm_response.get_completion_tokens(), 
+                total_tokens=llm_response.get_total_tokens()
+            )
+            
             # Debug logging
             self._debug_print_llm_response(llm_response)
             data_logger = get_data_logger()
@@ -181,13 +208,29 @@ class OaiModel(LlmModel):
             raise
 
     async def async_complete(self, messages: List[Message], tools: Optional[List[Dict[str, Any]]] = None,
-                           tool_choice: Optional[Union[str, Dict[str, Any]]] = None, **kwargs) -> LlmResponse:
+                           tool_choice: Optional[Union[str, Dict[str, Any]]] = None, trace_name: Optional[str] = None, **kwargs) -> LlmResponse:
         """Async completion using OpenAI models."""
         start_time = time.time()
         
         try:
             openai_messages = self._convert_messages_to_openai(messages)
             openai_tools = self._convert_tools_to_openai(tools)
+            formatted_messages = self._format_messages(messages)
+            
+            # Create Langfuse trace
+            trace = self._create_trace(name=trace_name or "oai_async_completion")
+            
+            # Create Langfuse generation
+            generation = self._trace_generation(
+                trace=trace, 
+                name="openai_async_completion",
+                model=self.model, 
+                formatted_messages=formatted_messages,
+                temperature=self.temperature, 
+                max_tokens=self.max_tokens, 
+                tools=tools, 
+                tool_choice=tool_choice
+            )
             
             # Prepare request parameters
             request_params = {
@@ -209,6 +252,16 @@ class OaiModel(LlmModel):
             
             latency = time.time() - start_time
             llm_response = self._convert_openai_response(response, latency)
+            
+            # Update Langfuse trace with results
+            self._trace_end(
+                trace=trace, 
+                generation=generation, 
+                output=llm_response.content or "",
+                prompt_tokens=llm_response.get_prompt_tokens(),
+                completion_tokens=llm_response.get_completion_tokens(), 
+                total_tokens=llm_response.get_total_tokens()
+            )
             
             # Debug logging
             self._debug_print_llm_response(llm_response)

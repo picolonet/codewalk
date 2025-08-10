@@ -10,7 +10,8 @@ import sys
 from code_walker import code_walker
 from console_logger import console_logger
 from llm.llm_router import llm_router
-
+from cw.cw_task import CwTask
+import os
 
 class CodeWalkCli:
     """Command line interface for CodeWalk using rich library."""
@@ -137,9 +138,16 @@ Use slash commands (/) for special operations.
                 self.console.print("Available types: oai, claude, llama, litellm")
         elif command == 'codewalk':
             if args:
-                # Use the provided subdirectory as the starting point
                 subdirectory = args[0]
-                self.run_codewalk(subdirectory)
+                # Check if third argument is 'pll' for parallel mode
+                if len(args) >= 2 and args[1] == 'pll':
+                    parallel_count = 3  # default
+                    if len(args) >= 3 and args[2].isdigit():
+                        parallel_count = int(args[2])
+                    self.run_codewalk_parallel(subdirectory, parallel_count)
+                else:
+                    # Use the provided subdirectory as the starting point
+                    self.run_codewalk(subdirectory)
             else:
                 # Use current directory as the starting point
                 self.run_codewalk()
@@ -199,14 +207,42 @@ Use slash commands (/) for special operations.
         with self.console.status("[bold green]Walking through the code ...", spinner="dots") as status:
             console_logger.set_status(status)
             code_walker.run_codewalk(code_base_path=code_base_path)
+
+    def run_codewalk_parallel(self, subdirectory: str = None, parallel_count: int = 3):
+        """Run codewalk with parallel processing."""
+        import os
+        
+        if subdirectory:
+            # Use the full path including the subdirectory as the starting point
+            code_base_path = os.path.abspath(subdirectory)
+            if not os.path.exists(code_base_path):
+                self.console.print(f"[red]Directory not found: {code_base_path}[/red]")
+                return
+            if not os.path.isdir(code_base_path):
+                self.console.print(f"[red]Path is not a directory: {code_base_path}[/red]")
+                return
+            
+            self.console.print(f"[dim]Starting parallel codewalk ({parallel_count} workers) from: {code_base_path}[/dim]")
+        else:
+            # Use current directory as the starting point
+            code_base_path = os.getcwd()
+            self.console.print(f"[dim]Starting parallel codewalk ({parallel_count} workers) from current directory: {code_base_path}[/dim]")
+        
+        with self.console.status(f"[bold green]Walking through the code with {parallel_count} parallel workers...", spinner="dots") as status:
+            console_logger.set_status(status)
+            code_walker.run_codewalk_parallel(parallel_count=parallel_count, code_base_path=code_base_path)
     
     def process_query(self, query: str):
         """Process a user query through the CodeWalker."""
         with self.console.status("[bold green]Processing query...", spinner="dots"):
-            full_response = code_walker.run_query(query)
+            #full_response = code_walker.run_query(query)
+            cw_task = CwTask(user_query=query, code_base_path=os.getcwd())
+            full_response = cw_task.run(query)
         
         response = full_response.last_response
         # Display the response in a panel
+        console_logger.log_text_panel(response.to_string(), title="Response", type="from_llm")
+
         self.console.print(Panel(
             response.content if response.content else "No response",
             title="Response",

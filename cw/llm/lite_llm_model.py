@@ -12,9 +12,11 @@ from util.data_logger import get_data_logger
 from llm.llm_model import LlmModel, Message, LlmResponse, ToolCall, ToolCallResponse
 
 
+
 class LiteLlmModel(LlmModel):
     def __init__(self, model: str, api_key: Optional[str] = None, base_url: Optional[str] = None,
      temperature: float = 0.7, max_tokens: Optional[int] = None):
+        super().__init__("lite_llm_claude")
         self.model = model
         self.api_key = api_key
         self.base_url = base_url
@@ -25,12 +27,11 @@ class LiteLlmModel(LlmModel):
             litellm.api_key = api_key
         if base_url:
             litellm.api_base = base_url
+            
 
-    def model_name(self) -> str:
-        return "lite_llm"
 
     def complete(self, messages: List[Message], tools: Optional[List[Dict[str, Any]]] = None,
-        tool_choice: Optional[Union[str, Dict[str, Any]]] = None, **kwargs) -> LlmResponse:
+        tool_choice: Optional[Union[str, Dict[str, Any]]] = None, trace_name: Optional[str] = None, **kwargs) -> LlmResponse:
         """Completes a chat conversation using the configured LLM.
 
         Args:
@@ -50,6 +51,8 @@ class LiteLlmModel(LlmModel):
         formatted_messages = self._format_messages(messages)
         # self._debug_print_formatted_messages(formatted_messages)
         
+        # Create Langfuse trace
+        trace = self._create_trace(name=trace_name or "llm_completion")
         
         completion_kwargs = {
             "model": self.model,
@@ -67,6 +70,21 @@ class LiteLlmModel(LlmModel):
         
         if tool_choice:
             completion_kwargs["tool_choice"] = tool_choice
+        
+        # Create Langfuse generation
+        # generation = trace.generation(
+        #     name="litellm_completion",
+        #     model=self.model,
+        #     input=formatted_messages,
+        #     metadata={
+        #         "temperature": self.temperature,
+        #         "max_tokens": self.max_tokens,
+        #         "tools": len(tools) if tools else 0,
+        #         "tool_choice": tool_choice
+        #     }
+        # )
+        generation = self._trace_generation(trace=trace, name="litellm_completion", model=self.model, formatted_messages=formatted_messages,
+            temperature=self.temperature, max_tokens=self.max_tokens, tools=tools, tool_choice=tool_choice)
         
         # Measure latency
         start_time = time.time()
@@ -109,9 +127,24 @@ class LiteLlmModel(LlmModel):
             usage=usage,
             latency_seconds=latency
         )
+        
+        # Update Langfuse generation with output and usage
+        # generation.end(
+        #     output=message.content,
+        #     usage={
+        #         "input": final_response.get_prompt_tokens(),
+        #         "output": final_response.get_completion_tokens(),
+        #         "total": final_response.get_total_tokens()
+        #     }
+        # )
+        self._trace_end(generation=generation, output=message.content, prompt_tokens=final_response.get_prompt_tokens(),
+            completion_tokens=final_response.get_completion_tokens(), total_tokens=final_response.get_total_tokens())
+        
         self._debug_print_llm_response(final_response)
         data_logger = get_data_logger()
-        data_logger.log_stats(self.model_name(), prompt_tokens=final_response.get_prompt_tokens(),
+        #print(self.model_name, type(self.model_name))
+
+        data_logger.log_stats(model_name=self.model_name, prompt_tokens=final_response.get_prompt_tokens(),
                  completion_tokens=final_response.get_completion_tokens(), latency_seconds=final_response.get_latency_seconds(),
                   operation="tool_call" if tool_calls != None else "completion")
         return final_response
@@ -147,10 +180,15 @@ class LiteLlmModel(LlmModel):
         return stream
 
     async def async_complete(self, messages: List[Message], tools: Optional[List[Dict[str, Any]]] = None,
-        tool_choice: Optional[Union[str, Dict[str, Any]]] = None, **kwargs) -> LlmResponse:
+        tool_choice: Optional[Union[str, Dict[str, Any]]] = None, trace_name: Optional[str] = None, **kwargs) -> LlmResponse:
         """Async version of complete method for parallel processing."""
         
         formatted_messages = self._format_messages(messages)
+
+        trace_name = trace_name or "llm_async_completion"
+        
+        # Create Langfuse trace
+        trace = self._create_trace(name=trace_name)
         
         completion_kwargs = {
             "model": self.model,
@@ -168,6 +206,21 @@ class LiteLlmModel(LlmModel):
         
         if tool_choice:
             completion_kwargs["tool_choice"] = tool_choice
+        
+        # Create Langfuse generation
+        # generation = trace.generation(
+        #     name="litellm_async_completion",
+        #     model=self.model,
+        #     input=formatted_messages,
+        #     metadata={
+        #         "temperature": self.temperature,
+        #         "max_tokens": self.max_tokens,
+        #         "tools": len(tools) if tools else 0,
+        #         "tool_choice": tool_choice
+        #     }
+        # )
+        generation = self._trace_generation(trace=trace, name=trace_name, model=self.model, formatted_messages=formatted_messages,
+            temperature=self.temperature, max_tokens=self.max_tokens, tools=tools, tool_choice=tool_choice)
         
         # Measure latency
         start_time = time.time()
@@ -210,6 +263,19 @@ class LiteLlmModel(LlmModel):
             usage=usage,
             latency_seconds=latency
         )
+        
+        # Update Langfuse generation with output and usage
+        # generation.end(
+        #     output=message.content,
+        #     usage={
+        #         "input": final_response.get_prompt_tokens(),
+        #         "output": final_response.get_completion_tokens(),
+        #         "total": final_response.get_total_tokens()
+        #     }
+        # )
+        self._trace_end(trace=trace, generation=generation, output=message.content, prompt_tokens=final_response.get_prompt_tokens(),
+            completion_tokens=final_response.get_completion_tokens(), total_tokens=final_response.get_total_tokens())
+        
         self._debug_print_llm_response(final_response)
         return final_response
 

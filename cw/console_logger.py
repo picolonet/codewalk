@@ -11,7 +11,7 @@ class ConsoleLogger:
         # Initialize Rich Console
         self.console = Console()
 
-    def log_json(self, message: dict, level: str = "INFO", title: Optional[str] = None, type = "to_llm"):
+    def log_json_panel(self, message: dict, level: str = "INFO", title: Optional[str] = None, type = "to_llm"):
         """
         Prints a JSON message in a log format using Rich.
         
@@ -20,7 +20,15 @@ class ConsoleLogger:
             level (str): The log level (e.g., INFO, DEBUG, ERROR).
             type (str): to_llm or from_llm or user 
         """
-        # Time stamp
+        # Format the JSON
+        json_renderable = JSON(json.dumps(message, indent=2))
+        self.log_text_panel(json_renderable, level=level, title=title, type=type)
+
+    def log_text_panel(self, message: str, level: str = "INFO", title: Optional[str] = None, type = "to_llm"):
+        """
+        Prints a text message in a log format using Rich.
+        """
+             # Time stamp
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         # Construct the log header
@@ -36,12 +44,9 @@ class ConsoleLogger:
             "user": "yellow"
         }.get(level, "white")
 
-        # Format the JSON
-        json_renderable = JSON(json.dumps(message, indent=2))
-
         # Combine header and JSON into a panel
         panel = Panel(
-            json_renderable,
+            message,
             title=header,
             border_style=border_color,
             expand=True
@@ -49,6 +54,7 @@ class ConsoleLogger:
 
         # Print the panel to the console
         self.console.print(panel)
+
 
     def set_status(self, status):
         self.console_status = status
@@ -74,8 +80,8 @@ if __name__ == "__main__":
         "metadata": {"ip": "192.168.1.10", "browser": "Firefox"}
     }
     cl = ConsoleLogger()
-    cl.log_json(sample_json, level="INFO")
-    cl.log_json(sample_json, level="ERROR")
-    cl.log_json(sample_json, level="DEBUG")
+    cl.log_json_panel(sample_json, level="INFO")
+    cl.log_json_panel(sample_json, level="ERROR")
+    cl.log_json_panel(sample_json, level="DEBUG")
 
 console_logger = ConsoleLogger()

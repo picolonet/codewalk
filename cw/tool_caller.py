@@ -7,10 +7,10 @@ from pydantic import BaseModel
 from util.livepanel import LivePanel
 from console_logger import console_logger
 from llm.llm_router import llm_router
-
+from util.cw_constants import IGNORE_FILE_LIST
 import os
 
-IGNORE_FILE_LIST = [".git", ".env", ".github", ".claude", ".venv_1"]
+
 
 def filter_list(input_list, ignore_list):
     return [item for item in input_list if item not in ignore_list]
@@ -34,7 +34,7 @@ class ToolCaller:
     def post_json(self, title:str, messages: List[Message], type: str):
         # Convert Pydantic models to dicts for JSON rendering
         message_dicts = [m.model_dump(exclude_none=True) for m in messages]
-        console_logger.log_json(message_dicts, title=title, type=type)
+        console_logger.log_json_panel(message_dicts, title=title, type=type)
 
     
     def register_tool(self, name: str, description: str, parameters: Dict[str, Any], 
@@ -87,6 +87,7 @@ class ToolCaller:
             if param.default == inspect.Parameter.empty:
                 parameters["required"].append(param_name)
         
+        print(f"Registering tool: {name} with parameters: {parameters} and description: {description}\n")
         self.register_tool(name, description, parameters, function)
     
     def get_tool_schemas(self) -> List[Dict[str, Any]]:
@@ -191,7 +192,7 @@ class ToolCaller:
             last_response = self.llm_model.complete(messages=full_conversation, tools=self.get_tool_schemas(),
                 tool_choice=tool_choice)
             print(f"Latency (sec) = {last_response.latency_seconds}")
-            data_logger.log_stats(self.llm_model.model_name(), prompt_tokens=last_response.get_prompt_tokens(),
+            data_logger.log_stats(self.llm_model.get_model_name(), prompt_tokens=last_response.get_prompt_tokens(),
                  completion_tokens=last_response.get_completion_tokens(), latency_seconds=last_response.get_latency_seconds(),
                   operation="tool_call" if has_tool_calls else "completion")
             
@@ -286,3 +287,5 @@ def _search_files_internal(directory: str, pattern: str) -> str:
         return "\n".join(matches) if matches else "No files found matching pattern"
     except Exception as e:
         return f"Error searching files: {str(e)}"
+
+
