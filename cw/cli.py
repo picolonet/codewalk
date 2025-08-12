@@ -1,3 +1,9 @@
+
+
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent))
+
 from typing import Dict, Any, Optional
 from rich.console import Console
 from rich.panel import Panel
@@ -286,6 +292,9 @@ Use slash commands (/) for special operations.
                 raise
 
 
-if __name__ == "__main__":
+def main():
     cli = CodeWalkCli()
     cli.run()
+
+if __name__ == "__main__":
+    main()

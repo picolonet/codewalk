@@ -13,64 +13,9 @@ from litellm.types.utils import StreamingChoices
 import os
 import time
 from dotenv import load_dotenv
-from console_logger import console_logger
+from cw.console_logger import console_logger
 from langfuse import Langfuse
-
-
-class ToolCall(BaseModel):
-    id: str
-    type: str = "function"
-    function: Dict[str, Any]
-
-
-class ToolCallResponse(BaseModel):
-    id: str
-    content: str
-    tool_call_id: str
-
-
-class Message(BaseModel):
-    role: str
-    content: Optional[str] = None
-    tool_calls: Optional[List[ToolCall]] = None
-    tool_call_id: Optional[str] = None
-  
-    def to_string(self) -> str:
-        """Convert a Message object to a string representation."""
-        result = []
-        if self.content:
-            result.append(self.content)
-        
-        if self.tool_calls:
-            for tool_call in self.tool_calls:
-                result.append(f"Tool Call {tool_call.id}:")
-                result.append(f"Function: {tool_call.function.get('name')}")
-                result.append(f"Arguments: {json.dumps(tool_call.function.get('arguments'), indent=2)}")
-        
-        if self.tool_call_id:
-            result.append(f"Tool Call ID: {self.tool_call_id}")
-            
-        return "\n".join(result)
-
-
-class LlmResponse(BaseModel):
-    content: Optional[str] = None
-    tool_calls: Optional[List[ToolCall]] = None
-    finish_reason: str
-    usage: Dict[str, Any]
-    latency_seconds: Optional[float] = None
-
-    def get_latency_seconds(self) -> float:
-        return self.latency_seconds
-    
-    def get_prompt_tokens(self) -> int:
-        return self.usage.get("prompt_tokens", 0)
-    
-    def get_completion_tokens(self) -> int:
-        return self.usage.get("completion_tokens", 0)
-
-    def get_total_tokens(self) -> int:
-        return self.usage.get("total_tokens", 0)
+from llm.llm_common import Message, LlmResponse
 
 
 def format_messages(messages: List[Message]) -> List[Dict[str, Any]]:
@@ -167,7 +112,7 @@ class LlmModel(ABC):
             
         # Print as formatted JSON
         json_str = json.dumps(response_dict, indent=2)
-        console_logger.log_json_panel(response_dict, title="LLM Response", type = "from_llm")
+        console_logger.log_json_panel(response_dict, title="LlmModel: LLM Response", type = "from_llm")
         #console.print(Panel(json_str, title="LLM Response", border_style="green"))
 
     def _create_trace(self, name: str):

@@ -25,3 +25,9 @@ Goal is to use agentic exploration for code understanding.
 1. Gitingest has code for directory traversal including markdown flattening of dir structure as a markdown
    fenced code block. ``` tree
 2. xml should also work for dir structure.
+
+
+
+### Sample Queries
+
+FastApi:  how does an api request get handled through various classes and functions in this project ?

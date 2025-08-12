@@ -9,7 +9,8 @@ import asyncio
 from dotenv import load_dotenv
 from console_logger import console_logger
 from util.data_logger import get_data_logger
-from llm.llm_model import LlmModel, Message, LlmResponse, ToolCall, ToolCallResponse
+from llm.llm_model import LlmModel, Message, LlmResponse
+from llm.llm_common import ToolCall, ToolCallResponse
 
 
 
@@ -71,18 +72,7 @@ class LiteLlmModel(LlmModel):
         if tool_choice:
             completion_kwargs["tool_choice"] = tool_choice
         
-        # Create Langfuse generation
-        # generation = trace.generation(
-        #     name="litellm_completion",
-        #     model=self.model,
-        #     input=formatted_messages,
-        #     metadata={
-        #         "temperature": self.temperature,
-        #         "max_tokens": self.max_tokens,
-        #         "tools": len(tools) if tools else 0,
-        #         "tool_choice": tool_choice
-        #     }
-        # )
+
         generation = self._trace_generation(trace=trace, name="litellm_completion", model=self.model, formatted_messages=formatted_messages,
             temperature=self.temperature, max_tokens=self.max_tokens, tools=tools, tool_choice=tool_choice)
         
@@ -128,15 +118,7 @@ class LiteLlmModel(LlmModel):
             latency_seconds=latency
         )
         
-        # Update Langfuse generation with output and usage
-        # generation.end(
-        #     output=message.content,
-        #     usage={
-        #         "input": final_response.get_prompt_tokens(),
-        #         "output": final_response.get_completion_tokens(),
-        #         "total": final_response.get_total_tokens()
-        #     }
-        # )
+
         self._trace_end(generation=generation, output=message.content, prompt_tokens=final_response.get_prompt_tokens(),
             completion_tokens=final_response.get_completion_tokens(), total_tokens=final_response.get_total_tokens())
         
@@ -207,18 +189,7 @@ class LiteLlmModel(LlmModel):
         if tool_choice:
             completion_kwargs["tool_choice"] = tool_choice
         
-        # Create Langfuse generation
-        # generation = trace.generation(
-        #     name="litellm_async_completion",
-        #     model=self.model,
-        #     input=formatted_messages,
-        #     metadata={
-        #         "temperature": self.temperature,
-        #         "max_tokens": self.max_tokens,
-        #         "tools": len(tools) if tools else 0,
-        #         "tool_choice": tool_choice
-        #     }
-        # )
+
         generation = self._trace_generation(trace=trace, name=trace_name, model=self.model, formatted_messages=formatted_messages,
             temperature=self.temperature, max_tokens=self.max_tokens, tools=tools, tool_choice=tool_choice)
         
@@ -264,15 +235,7 @@ class LiteLlmModel(LlmModel):
             latency_seconds=latency
         )
         
-        # Update Langfuse generation with output and usage
-        # generation.end(
-        #     output=message.content,
-        #     usage={
-        #         "input": final_response.get_prompt_tokens(),
-        #         "output": final_response.get_completion_tokens(),
-        #         "total": final_response.get_total_tokens()
-        #     }
-        # )
+
         self._trace_end(trace=trace, generation=generation, output=message.content, prompt_tokens=final_response.get_prompt_tokens(),
             completion_tokens=final_response.get_completion_tokens(), total_tokens=final_response.get_total_tokens())
         

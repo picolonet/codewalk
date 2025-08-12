@@ -22,7 +22,7 @@ class ConsoleLogger:
         """
         # Format the JSON
         json_renderable = JSON(json.dumps(message, indent=2))
-        self.log_text_panel(json_renderable, level=level, title=title, type=type)
+        self.log_text_panel(message=json_renderable, level=level, title=title, type=type)
 
     def log_text_panel(self, message: str, level: str = "INFO", title: Optional[str] = None, type = "to_llm"):
         """
@@ -55,6 +55,9 @@ class ConsoleLogger:
         # Print the panel to the console
         self.console.print(panel)
 
+    def log_text(self, message:str, level: str = "INFO"):
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.console.print(f"[{timestamp}] [{level.upper()}] {message}")
 
     def set_status(self, status):
         self.console_status = status

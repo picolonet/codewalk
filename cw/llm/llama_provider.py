@@ -10,8 +10,9 @@ import groq
 from groq import Groq, AsyncGroq
 from groq.types.chat import ChatCompletion
 
-from .llm_model import Message, LlmResponse, ToolCall
-from console_logger import console_logger
+from llm.llm_model import Message, LlmResponse
+from cw.console_logger import console_logger
+from llm.llm_common import ToolCall
 
 
 class LlamaProvider(ABC):

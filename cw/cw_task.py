@@ -1,18 +1,20 @@
+import inspect
 import json
-from typing import List, Optional, Dict, Any
+from typing import Callable, List, Optional, Dict, Any
 
 from aiohttp.payload import TOO_LARGE_BYTES_BODY
-from cw import console_logger
-from cw.llm import llm_router
+from cw.console_logger import console_logger
+from cw.llm.llm_router import llm_router
 from cw.util.data_logger import get_data_logger
 from tool_caller import CompletionResult, ToolCaller, get_file_contents, list_directory, search_files
-from llm.llm_model import Message, ToolCall, ToolCallResponse
 from enum import Enum
 import xml.etree.ElementTree as ET
 from datetime import datetime
 from pydantic import BaseModel
 from cw_prompts import cw_analyze_file_prompt, cw_analyze_v0, cwcc_system_prompt, cw_todo_write_tool_description, TODO_MODIFICATION_RESPONSE_MSG
 from cw.util.cw_common import get_env
+from llm.llm_completion import LlmCompletion
+from llm.llm_common import Message, CompletionResult
 
 class TodoStatus(Enum):
     PENDING = "pending"
@@ -42,82 +44,6 @@ class TodoItem(BaseModel):
             "status": self.status.value,
             "priority": self.priority.value
         }
-
-# class TaskPlan:
-#     def __init__(self, plan_name: str, plan_description: str, plan_steps: List[str]):
-#         self.plan_name = plan_name
-#         self.plan_description = plan_description
-#         self.plan_steps = plan_steps
-#         self.plan_status = {step: TaskStatus.PENDING for step in plan_steps}
-#         self.created_at = datetime.now()
-#         self.updated_at = datetime.now()
-
-#     def update_step_status(self, step: str, status: TaskStatus) -> bool:
-#         """Update the status of a specific plan step.
-        
-#         Args:
-#             step: The plan step to update
-#             status: The new TaskStatus for the step
-            
-#         Returns:
-#             bool: True if update was successful, False if step not found
-#         """
-#         if step in self.plan_status:
-#             self.plan_status[step] = status
-#             self.updated_at = datetime.now()
-#             return True
-#         return False
-
-#     def get_step_status(self, step: str) -> Optional[TaskStatus]:
-#         """Get the current status of a plan step.
-        
-#         Args:
-#             step: The plan step to query
-            
-#         Returns:
-#             TaskStatus if step exists, None otherwise
-#         """
-#         return self.plan_status.get(step)
-
-#     def get_all_steps_with_status(self) -> List[tuple]:
-#         """Get all steps with their current status.
-        
-#         Returns:
-#             List of (step, status) tuples
-#         """
-#         return [(step, self.plan_status[step]) for step in self.plan_steps]
-
-#     def to_xml(self) -> str:
-#         """Convert TaskPlan to XML format.
-        
-#         Returns:
-#             str: XML representation of the TaskPlan
-#         """
-#         root = ET.Element("TaskPlan")
-        
-#         # Add plan metadata
-#         name_elem = ET.SubElement(root, "name")
-#         name_elem.text = self.plan_name
-        
-#         description_elem = ET.SubElement(root, "description")
-#         description_elem.text = self.plan_description
-        
-#         created_elem = ET.SubElement(root, "created_at")
-#         created_elem.text = self.created_at.isoformat()
-        
-#         updated_elem = ET.SubElement(root, "updated_at")
-#         updated_elem.text = self.updated_at.isoformat()
-        
-#         # Add steps with their status
-#         steps_elem = ET.SubElement(root, "steps")
-#         for step in self.plan_steps:
-#             step_elem = ET.SubElement(steps_elem, "step")
-#             step_elem.set("status", self.plan_status[step].value)
-#             step_elem.text = step
-        
-#         # Convert to string with proper formatting
-#         ET.indent(root, space="  ", level=0)
-#         return ET.tostring(root, encoding='unicode', xml_declaration=True)
         
 
 class CwTask:
@@ -126,13 +52,27 @@ class CwTask:
         self.code_base_path = code_base_path
         self.memory: List[Message] = []
         self.todos: List[TodoItem] = []
+        self.tools: Dict[str, Dict[str, Any]] = {}
+        self.tool_functions: Dict[str, Callable] = {}
+
         self.tool_caller = ToolCaller()
         self.tool_caller.register_tool_from_function(get_file_contents)
         self.tool_caller.register_tool_from_function(list_directory)
         self.tool_caller.register_tool_from_function(search_files)
         self.tool_caller.register_tool_from_function(self.todo_write, cw_todo_write_tool_description())
-        self.memory.append(Message(role="system", content=cwcc_system_prompt(get_env())))
 
+        # self.register_tool_from_function(get_file_contents)
+        # self.register_tool_from_function(list_directory)
+        # self.register_tool_from_function(search_files)
+        # self.register_tool_from_function(self.todo_write, cw_todo_write_tool_description())
+        # self.memory.append(Message(role="system", content=cwcc_system_prompt(get_env())))
+
+    def conversation_history_preprocessor(self, messages: List[Message]) -> List[Message]:
+        """Pre-process the conversation history before the LLM is called."""
+        if self.has_todos():
+            messages.append(self.todo_summary_message())
+            console_logger.log_text(f"Appending TODOs: {self.todo_to_json()}")
+        return messages
 
     def are_todos_complete(self) -> bool:
         """Check if all todos are completed."""
@@ -144,8 +84,10 @@ class CwTask:
 
 
     def run(self, query: str):
-        self.memory.append(Message(role="user", content=query))
-        return self.tool_caller.full_completion_with_tools(messages=self.memory)
+        query_message = Message(role="user", content=query)
+        llm_completion = LlmCompletion(self.memory, self.tool_caller)
+        llm_completion.register_conversation_history_preprocessor(self.conversation_history_preprocessor)
+        return llm_completion.complete(query_message)
 
     def todo_write(self, todos: List[Dict[str, Any]]) -> str:
         """Tool function to write a todo list.
@@ -176,10 +118,18 @@ class CwTask:
                 }
             ]
         """
-        console_logger.info(f"TOOL CALL Updating todos: {todos}")
+        console_logger.log_text(f"TOOL CALL Updating todos: {todos}")
         return self._todo_write_internal(todos)
 
+
     def _todo_write_internal(self, todos: List[Dict[str, Any]]) -> str:
+
+        #console_logger.log_text(f"_todo_write_internal: Arguments {todos} with type {type(todos)}")
+
+        if (type(todos) == str):
+            todos = json.loads(todos)
+            #console_logger.log_text(f"after json.loads {todos} with type {type(todos)}")
+
 
         try:
             # Validate and create TodoItem objects
@@ -217,7 +167,7 @@ class CwTask:
         """Create a summary message of the todos."""
         return Message(role="system", content=TODO_MODIFICATION_RESPONSE_MSG + self.todo_to_json())
 
-    def llm_completion_with_tools(self, messages: List[Message], tool_choice: Optional[str] = "auto",
+    def __llm_completion_with_tools(self, messages: List[Message], tool_choice: Optional[str] = "auto",
                            max_iterations: int = 50 ) -> CompletionResult:
         """Complete a conversation with automatic tool execution."""
 
@@ -232,20 +182,25 @@ class CwTask:
         current_result: List[Message] = []
         has_tool_calls = False    
         data_logger = get_data_logger()
+
+        user_facing_result = ""
         
         for iteration in range(max_iterations):
             # Get response from LLM
             full_conversation_with_todos = full_conversation.copy()
             if self.has_todos():
                 full_conversation_with_todos.append(self.todo_summary_message())
-                console_logger.info(f"Appending TODOs: {self.todo_to_json()}")
+                console_logger.log_text(f"Appending TODOs: {self.todo_to_json()}")
             last_response = self.llm_model.complete(messages=full_conversation_with_todos, tools=self.get_tool_schemas(),
                 tool_choice=tool_choice)
-            print(f"Latency (sec) = {last_response.latency_seconds}")
+            # print(f"Latency (sec) = {last_response.latency_seconds}")
             data_logger.log_stats(self.llm_model.get_model_name(), prompt_tokens=last_response.get_prompt_tokens(),
                  completion_tokens=last_response.get_completion_tokens(), latency_seconds=last_response.get_latency_seconds(),
                   operation="tool_call" if has_tool_calls else "completion")
             
+            if last_response.content:
+                user_facing_result = last_response.content
+      
             # Add assistant message to conversation
             assistant_message = Message(
                 role = "assistant",
@@ -281,46 +236,12 @@ class CwTask:
                 current_result.append(tool_message)
         
         # Display final result to console.
-        console_logger.log_json(current_result, title="LLM completion with tools result")
+        self.post_json("LLM completion with tools result", current_result, type="from_llm")
         # self.stop_debugpanel()
         return CompletionResult(has_tool_calls=has_tool_calls, full_conversation=full_conversation,
-                                 current_result=current_result, last_response=assistant_message)
-
-    def execute_tool(self, tool_call: ToolCall) -> ToolCallResponse:
-        """Execute a tool call and return the response."""
-        function_name = tool_call.function.get("name")
-        
-        if function_name not in self.tool_functions:
-            return ToolCallResponse(
-                id=f"resp_{tool_call.id}",
-                content=f"Error: Tool '{function_name}' not found",
-                tool_call_id=tool_call.id
-            )
-        
-        try:
-            # Parse arguments
-            arguments_str = tool_call.function.get("arguments", "{}")
-            arguments = json.loads(arguments_str) if isinstance(arguments_str, str) else arguments_str
-            
-            # Execute the function
-            result = self.tool_functions[function_name](**arguments)
-            
-            # Convert result to string if needed
-            if not isinstance(result, str):
-                result = str(result)
-            
-            return ToolCallResponse(
-                id=f"resp_{tool_call.id}",
-                content=result,
-                tool_call_id=tool_call.id
-            )
-            
-        except Exception as e:
-            return ToolCallResponse(
-                id=f"resp_{tool_call.id}",
-                content=f"Error executing {function_name}: {str(e)}",
-                tool_call_id=tool_call.id
-            )
+                                 current_result=current_result, last_response=assistant_message,
+                                 user_facing_result=user_facing_result)
+   
     
 
     def todo_to_xml(self) -> str:
@@ -348,13 +269,16 @@ class CwTask:
         Returns:
             str: JSON representation of the TodoItem
         """
-        return json.dumps(self.todos, indent=4)
+        return "\n".join([t.model_dump_json() for t in self.todos])
     
     def _todo_write_response(self) -> str:
-        todo_str = self.todo_to_json()
+        log_str = "\n".join([t.model_dump_json() for t in self.todos])
+
         # Escape quotes and newlines for string concatenation
-        todo_str = todo_str.replace('"', '\\"').replace('\n', '\\n')
-        return TODO_MODIFICATION_RESPONSE_MSG + todo_str
+        todo_str = log_str.replace('"', '\\"').replace('\n', '\\n')
+        return TODO_MODIFICATION_RESPONSE_MSG + "\n" + todo_str
+
+        # TODO: Move to console_logger.py
 
 
 # DONEs:
@@ -365,6 +289,7 @@ class CwTask:
 # 2. Include TODOs as system reminder message to LLM added at the end, check wilson-traces.
 # 3. Run on large codebase and see differences
 # 4. Allow llm agentic call as a tool, mimicing claude code.
+# 5. Add a config with logs dir etc.
 
 
 # TODOS; Llama Meta:

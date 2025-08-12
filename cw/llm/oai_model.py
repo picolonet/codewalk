@@ -12,8 +12,9 @@ from openai.types.chat.chat_completion import Choice
 from openai.types.chat.chat_completion_message_tool_call import ChatCompletionMessageToolCall
 
 from util.data_logger import get_data_logger
-from llm.llm_model import LlmModel, Message, LlmResponse, ToolCall
-from console_logger import console_logger
+from llm.llm_model import LlmModel, Message, LlmResponse
+from cw.console_logger import console_logger
+from llm.llm_common import ToolCall
 
 
 class OaiModel(LlmModel):

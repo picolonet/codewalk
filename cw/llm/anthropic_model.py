@@ -8,7 +8,8 @@ import anthropic
 from anthropic import Anthropic, AsyncAnthropic
 from anthropic.types import Message as AnthropicMessage, MessageParam
 
-from llm.llm_model import LlmModel, Message, LlmResponse, ToolCall
+from llm.llm_model import LlmModel, Message, LlmResponse
+from llm.llm_common import ToolCall
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))

@@ -1,6 +1,6 @@
 from typing import Dict, Any, List, Optional, Callable
 from cw.util.data_logger import get_data_logger
-from llm.llm_model import LlmModel, Message, ToolCall, ToolCallResponse, format_messages
+from llm.llm_model import LlmModel, format_messages
 import json
 import inspect
 from pydantic import BaseModel
@@ -9,19 +9,13 @@ from console_logger import console_logger
 from llm.llm_router import llm_router
 from util.cw_constants import IGNORE_FILE_LIST
 import os
-
+from llm.llm_common import CompletionResult
+from llm.llm_common import ToolCall, ToolCallResponse, Message
 
 
 def filter_list(input_list, ignore_list):
     return [item for item in input_list if item not in ignore_list]
 
-
-class CompletionResult(BaseModel):
-    """Result of a completion with tools. Includes the full conversation and the current conversation."""
-    has_tool_calls: bool
-    full_conversation: List[Message]
-    current_result: List[Message]
-    last_response: Message # The final message
 
 class ToolCaller:
     """Handles tool registration and execution for LLM interactions."""
@@ -109,6 +103,12 @@ class ToolCaller:
             # Parse arguments
             arguments_str = tool_call.function.get("arguments", "{}")
             arguments = json.loads(arguments_str) if isinstance(arguments_str, str) else arguments_str
+
+
+            console_logger.log_text(f"Tool call: {tool_call}")
+            console_logger.log_text(f"Tool call function: {tool_call.function}")
+            console_logger.log_text(f"Tool call arguments: {arguments_str}")
+            console_logger.log_text(f"Executing tool: {function_name} with arguments: {arguments}")
             
             # Execute the function
             result = self.tool_functions[function_name](**arguments)
@@ -232,7 +232,8 @@ class ToolCaller:
         
         # self.stop_debugpanel()
         return CompletionResult(has_tool_calls=has_tool_calls, full_conversation=full_conversation,
-                                 current_result=current_result, last_response=assistant_message)
+                                 current_result=current_result, last_response=assistant_message,
+                                 user_facing_result=assistant_message.content)
 
 
 
