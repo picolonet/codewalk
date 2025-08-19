@@ -1,0 +1,2 @@
+[console_scripts]
+codewalk = cw.cli:main
