@@ -28,6 +28,14 @@ Goal is to use agentic exploration for code understanding.
 2. xml should also work for dir structure.
 
 
+### Langfuse:
+
+langfuse-2.60.9
+pip install "langfuse<3.0.0"
+
+Needed to fix the error:
+AttributeError: 'Langfuse' object has no attribute 'trace'
+
 
 ### Sample Queries
 
