@@ -6,7 +6,10 @@ from pathlib import Path
 
 from cw.code_walker2 import CodeWalker2
 from cw.kb.knowledge_base import build_knowledge_base_with_summary
+
 sys.path.append(str(Path(__file__).parent))
+sys.path.append(str(Path(__file__).parent / "cw"))
+
 
 from typing import Dict, Any, Optional
 from rich.console import Console
@@ -23,6 +26,7 @@ from cw.cw_task import CwTask
 from kb.kb_builder import KBBuilder
 import os
 from cw.cw_config import get_cw_config
+
 
 
 class CodeWalkCli:
