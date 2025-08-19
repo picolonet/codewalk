@@ -24,6 +24,12 @@ class ToolCaller:
         self.tools: Dict[str, Dict[str, Any]] = {}
         self.tool_functions: Dict[str, Callable] = {}
 
+
+    def register_basic_tools(self):
+        self.register_tool_from_function(get_file_contents)
+        self.register_tool_from_function(list_directory)
+        self.register_tool_from_function(search_files)
+
     
     def post_json(self, title:str, messages: List[Message], type: str):
         # Convert Pydantic models to dicts for JSON rendering

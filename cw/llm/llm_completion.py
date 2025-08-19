@@ -4,14 +4,16 @@ from cw.util.data_logger import get_data_logger
 from tool_caller import ToolCaller
 from llm.llm_common import CompletionResult, LlmUtils, Message
 from typing import Callable
+from console_logger import console_logger
 
 class LlmCompletion:
     def __init__(self, message_history: List[Message],
-        tool_caller: ToolCaller, max_iterations: int = 50):
+        tool_caller: ToolCaller, max_iterations: int = 50, aggregate_stats_key: str = "aggregate_key"):
         self.message_history = message_history
         self.max_iterations = max_iterations
         self.user_facing_result = ""
         self.tool_caller = tool_caller
+        self.aggregate_stats_key = aggregate_stats_key
 
     def register_conversation_history_preprocessor(self, processor: Callable[[List[Message]], List[Message]]) -> None:
         """Register a callable that pre-processes and potentially modifies the conversation / message history before the LLM is called.
@@ -21,7 +23,7 @@ class LlmCompletion:
         """
         self.message_preprocessor = processor
 
-    def complete(self, query: Message, tool_choice: Optional[str] = "auto", **kwargs) -> CompletionResult:
+    def complete(self, query: Message, tool_choice: Optional[str] = "auto", trace_name: Optional[str] = None, operation_tag: Optional[str] = None, **kwargs) -> CompletionResult:
         """Complete a conversation with automatic tool execution."""
 
         self.llm_model = llm_router().get()
@@ -48,11 +50,16 @@ class LlmCompletion:
             #     console_logger.log_text(f"Appending TODOs: {self.todo_to_json()}")
             last_response = self.llm_model.complete(messages=full_conversation_preprocessed,
                 tools=self.tool_caller.get_tool_schemas(),
-                tool_choice=tool_choice)
+                tool_choice=tool_choice, trace_name=trace_name)
             # print(f"Latency (sec) = {last_response.latency_seconds}")
+            operation_tag = operation_tag or "completion"
+            console_logger.log_text(f"Operation tag: {operation_tag}, trace_name: {trace_name}")
             data_logger.log_stats(self.llm_model.get_model_name(), prompt_tokens=last_response.get_prompt_tokens(),
                  completion_tokens=last_response.get_completion_tokens(), latency_seconds=last_response.get_latency_seconds(),
-                  operation="tool_call" if has_tool_calls else "completion")
+                  operation=operation_tag)
+            data_logger.update_inmemory_stats(self.aggregate_stats_key, self.llm_model.get_model_name(),
+                last_response.get_prompt_tokens(), last_response.get_completion_tokens(),
+                last_response.get_latency_seconds(), operation=operation_tag)
             
             if last_response.content:
                 user_facing_result = last_response.content
@@ -78,6 +85,7 @@ class LlmCompletion:
             
             # Execute each tool call
             for tool_call in last_response.tool_calls:
+                # Log tool calls.
                 tool_response = self.tool_caller.execute_tool(tool_call)
                 
                 # Add tool response to conversation

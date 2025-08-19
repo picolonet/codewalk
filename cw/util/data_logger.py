@@ -21,7 +21,7 @@ class StatEntry:
     operation: str  # e.g., "completion", "codewalk", "query"
     session_id: Optional[str] = None
     error: Optional[str] = None
-    
+    stats_type: str = "SINGLE"
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return asdict(self)
@@ -56,6 +56,7 @@ class DataLogger:
         
         # Session tracking
         self.session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.inmemory_stats = {}
         
     def _setup_loggers(self):
         """Setup separate loggers for stats and general messages."""
@@ -93,10 +94,44 @@ class DataLogger:
             self.general_file = self.logs_dir / f"general_{self.current_date}.log"
             self._setup_loggers()
     
+    def update_inmemory_stats(self, stats_key: str,model_name: str, prompt_tokens: int, completion_tokens: int,
+                  latency_seconds: float, operation: str = "completion",
+                  error: Optional[str] = None, **kwargs):
+
+        if stats_key not in self.inmemory_stats:
+            self.inmemory_stats[stats_key] = {
+                "model_name": model_name,
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "latency_seconds": latency_seconds,
+                "operation": operation
+            }
+        else:
+            self.inmemory_stats[stats_key]["prompt_tokens"] += prompt_tokens
+            self.inmemory_stats[stats_key]["completion_tokens"] += completion_tokens
+            self.inmemory_stats[stats_key]["latency_seconds"] += latency_seconds
+
+    def update_inmemory_stats_with_tool_calls(self, stats_key: str):
+        pass
+
+    def log_inmemory_stats(self, stats_key: str):
+        if stats_key not in self.inmemory_stats:
+            return
+        
+        stat_entry = self.inmemory_stats[stats_key]
+        self.log_stats(
+            model_name=stat_entry["model_name"],
+            prompt_tokens=stat_entry["prompt_tokens"],
+            completion_tokens=stat_entry["completion_tokens"],
+            latency_seconds=stat_entry["latency_seconds"],
+            operation=stat_entry["operation"],
+            stats_type="AGGREGATED"
+        )
+        del self.inmemory_stats[stats_key]
 
     def log_stats(self, model_name: str, prompt_tokens: int, completion_tokens: int,
                   latency_seconds: float, operation: str = "completion",
-                  error: Optional[str] = None, **kwargs):
+                  error: Optional[str] = None, stats_type: str = "SINGLE", **kwargs):
         """
         Log statistics entry.
         
@@ -123,7 +158,8 @@ class DataLogger:
             latency_seconds=latency_seconds,
             operation=operation,
             session_id=self.session_id,
-            error=error
+            error=error,
+            stats_type=stats_type
         )
         
         # Add any additional kwargs to the entry

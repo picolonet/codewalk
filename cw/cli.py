@@ -1,7 +1,11 @@
 
 
 import sys
+import argparse
 from pathlib import Path
+
+from cw.code_walker2 import CodeWalker2
+from cw.kb.knowledge_base import build_knowledge_base_with_summary
 sys.path.append(str(Path(__file__).parent))
 
 from typing import Dict, Any, Optional
@@ -12,12 +16,14 @@ from rich.table import Table
 from rich.text import Text
 from rich.markdown import Markdown
 from rich import print as rprint
-import sys
 from code_walker import code_walker
 from console_logger import console_logger
 from llm.llm_router import llm_router
 from cw.cw_task import CwTask
+from kb.kb_builder import KBBuilder
 import os
+from cw.cw_config import get_cw_config
+
 
 class CodeWalkCli:
     """Command line interface for CodeWalk using rich library."""
@@ -25,6 +31,7 @@ class CodeWalkCli:
     def __init__(self):
         self.console = console_logger.console
         self.running = True
+        self.query_count = 0
         self.config = {
            # "model": "gpt-3.5-turbo",
             "temperature": 0.7,
@@ -51,6 +58,7 @@ class CodeWalkCli:
 • `/set <param> <value>` - Set configuration parameter\n
 • `/model <type>` - Switch LLM model (oai, claude, llama)\n
 • `/codewalk [subdirectory]` - Run codewalk analysis (optional subdirectory path)\n
+• `/build [pll] [workers]` - Build knowledge base for current directory (optional parallel mode)\n
 • `/exit` or `/quit` - Exit the application\n
 • `/clear` - Clear the screen\n
 
@@ -65,6 +73,8 @@ Use slash commands (/) for special operations.
 • `/codewalk` - Analyze current directory
 • `/codewalk src` - Analyze the 'src' subdirectory
 • `/codewalk /path/to/project` - Analyze specific directory path
+• `/build` - Build knowledge base for current directory
+• `/build pll 8` - Build knowledge base with 8 parallel workers
         """
         self.console.print(Panel(Markdown(help_text), title="Help", border_style="green"))
     
@@ -142,6 +152,12 @@ Use slash commands (/) for special operations.
             else:
                 self.console.print("[red]Usage: /model <type>[/red]")
                 self.console.print("Available types: oai, claude, llama, litellm")
+        elif command == 'build':
+            if args and args[0] == 'pll':
+                workers = int(args[1]) if len(args) > 1 and args[1].isdigit() else 4
+                self.build_knowledge_base(max_workers=workers)
+            else:
+                self.build_knowledge_base()
         elif command == 'codewalk':
             if args:
                 subdirectory = args[0]
@@ -165,7 +181,7 @@ Use slash commands (/) for special operations.
     
     def set_model(self, model_type: str):
         """Set the LLM model type."""
-        valid_models = ["oai", "claude", "llama", "litellm"]
+        valid_models = get_cw_config().VALID_MODELS
         
         if model_type.lower() not in valid_models:
             self.console.print(f"[red]Error: Invalid model type '{model_type}'[/red]")
@@ -237,24 +253,55 @@ Use slash commands (/) for special operations.
         with self.console.status(f"[bold green]Walking through the code with {parallel_count} parallel workers...", spinner="dots") as status:
             console_logger.set_status(status)
             code_walker.run_codewalk_parallel(parallel_count=parallel_count, code_base_path=code_base_path)
+
+    def build_knowledge_base(self, subdirectory: str = None, max_workers: int = 4):
+        """Build knowledge base for the entire repository using parallel file processing."""
+        if subdirectory:
+            # Use the full path including the subdirectory as the starting point
+            code_base_path = os.path.abspath(subdirectory)
+            if not os.path.exists(code_base_path):
+                self.console.print(f"[red]Directory not found: {code_base_path}[/red]")
+                return
+            if not os.path.isdir(code_base_path):
+                self.console.print(f"[red]Path is not a directory: {code_base_path}[/red]")
+                return
+            
+            self.console.print(f"[dim]Starting codewalk from: {code_base_path}[/dim]")
+        else:
+            # Use current directory as the starting point
+            code_base_path = os.getcwd()
+            self.console.print(f"[dim]Starting codewalk from current directory: {code_base_path}[/dim]")
+        
+        with self.console.status("[bold green]Building knowledge base ...", spinner="dots") as status:
+            kb_root = os.path.join(code_base_path, ".cw_kb")
+            kb = build_knowledge_base_with_summary(kb_root, max_workers=max_workers)
+            if kb:
+                self.console.print(f"[green]Knowledge base built successfully in: {kb_root}[/green]")
+            else:
+                self.console.print(f"[red]Failed to build knowledge base[/red]")
+        
     
     def process_query(self, query: str):
         """Process a user query through the CodeWalker."""
+        self.query_count += 1
         with self.console.status("[bold green]Processing query...", spinner="dots"):
             #full_response = code_walker.run_query(query)
-            cw_task = CwTask(user_query=query, code_base_path=os.getcwd())
-            full_response = cw_task.run(query)
-        
-        response = full_response.last_response
-        # Display the response in a panel
-        console_logger.log_text_panel(response.to_string(), title="Response", type="from_llm")
+            # cw_task = CwTask(user_query=query, code_base_path=os.getcwd())
+            #full_response = cw_task.run(query)
+            code_walker2 = CodeWalker2(code_base_path=os.getcwd())
+            full_response = code_walker2.run_query(query, operation_tag=f"user_query_{self.query_count}")
+            response = full_response.user_facing_result
+             # Display the response in a panel
+            console_logger.log_text_panel(response, title="Response", type="from_llm")
 
-        self.console.print(Panel(
-            response.content if response.content else "No response",
-            title="Response",
-            border_style="blue",
-            padding=(1, 2)
-        ))
+        last_response = full_response.last_response
+        if hasattr(last_response, 'content') and last_response.content:
+            self.console.print(Panel(
+                last_response.content if last_response.content else "No response",
+                title="Response",
+                border_style="blue",
+                padding=(1, 2)
+            ))
     
     def run(self):
         """Main interaction loop."""
@@ -293,8 +340,19 @@ Use slash commands (/) for special operations.
 
 
 def main():
+    parser = argparse.ArgumentParser(description='CodeWalk CLI - Code Analysis Tool')
+    parser.add_argument('-q', '--query', type=str, help='Process query directly without entering REPL mode')
+    
+    args = parser.parse_args()
+    
     cli = CodeWalkCli()
-    cli.run()
+    
+    if args.query:
+        # Direct query mode - process and exit
+        cli.process_query(args.query)
+    else:
+        # Interactive REPL mode
+        cli.run()
 
 if __name__ == "__main__":
     main()

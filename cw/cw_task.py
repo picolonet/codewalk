@@ -47,25 +47,30 @@ class TodoItem(BaseModel):
         
 
 class CwTask:
-    def __init__(self, user_query: str, code_base_path: str):
+    def __init__(self, user_query: str, code_base_path: str, task_system_prompt: str = "", operation_tag: str = "completion"):
         self.user_query = user_query
         self.code_base_path = code_base_path
         self.memory: List[Message] = []
         self.todos: List[TodoItem] = []
         self.tools: Dict[str, Dict[str, Any]] = {}
         self.tool_functions: Dict[str, Callable] = {}
-
+        self.operation_tag = operation_tag
         self.tool_caller = ToolCaller()
-        self.tool_caller.register_tool_from_function(get_file_contents)
-        self.tool_caller.register_tool_from_function(list_directory)
-        self.tool_caller.register_tool_from_function(search_files)
+        self.tool_caller.register_basic_tools()
         self.tool_caller.register_tool_from_function(self.todo_write, cw_todo_write_tool_description())
+        system_prompt = cwcc_system_prompt(get_env()) if task_system_prompt == "" else task_system_prompt
+        self.memory.append(Message(role="system", content=system_prompt))
+        # self.memory.append(Message(role="system", content=cwcc_system_prompt(get_env())))
 
         # self.register_tool_from_function(get_file_contents)
         # self.register_tool_from_function(list_directory)
         # self.register_tool_from_function(search_files)
         # self.register_tool_from_function(self.todo_write, cw_todo_write_tool_description())
         # self.memory.append(Message(role="system", content=cwcc_system_prompt(get_env())))
+
+    def get_tool_caller(self) -> ToolCaller:
+        """Get the tool caller for the task to register additional tools."""
+        return self.tool_caller
 
     def conversation_history_preprocessor(self, messages: List[Message]) -> List[Message]:
         """Pre-process the conversation history before the LLM is called."""
@@ -87,7 +92,7 @@ class CwTask:
         query_message = Message(role="user", content=query)
         llm_completion = LlmCompletion(self.memory, self.tool_caller)
         llm_completion.register_conversation_history_preprocessor(self.conversation_history_preprocessor)
-        return llm_completion.complete(query_message)
+        return llm_completion.complete(query_message, trace_name=self.operation_tag, operation_tag=self.operation_tag)
 
     def todo_write(self, todos: List[Dict[str, Any]]) -> str:
         """Tool function to write a todo list.

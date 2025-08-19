@@ -6,6 +6,8 @@ from litellm.types.utils import StreamingChoices
 import os
 import time
 import asyncio
+import logging
+from datetime import datetime
 from dotenv import load_dotenv
 from console_logger import console_logger
 from util.data_logger import get_data_logger
@@ -23,12 +25,40 @@ class LiteLlmModel(LlmModel):
         self.base_url = base_url
         self.temperature = temperature
         self.max_tokens = max_tokens
+        #litellm._turn_on_debug()
+        
+        # Setup LiteLLM error logging
+        self._setup_litellm_logging()
         
         if api_key:
             litellm.api_key = api_key
         if base_url:
             litellm.api_base = base_url
             
+    def _setup_litellm_logging(self):
+        """Setup LiteLLM logging to capture errors to a file in logs/ directory"""
+        # Ensure logs directory exists
+        os.makedirs("logs", exist_ok=True)
+        
+        # Create a logger for LiteLLM errors
+        self.error_logger = logging.getLogger('litellm_errors')
+        self.error_logger.setLevel(logging.ERROR)
+        
+        # Create file handler for error logs
+        error_log_file = f"logs/litellm_errors_{datetime.now().strftime('%Y%m%d')}.log"
+        file_handler = logging.FileHandler(error_log_file)
+        file_handler.setLevel(logging.ERROR)
+        
+        # Create formatter
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        file_handler.setFormatter(formatter)
+        
+        # Add handler to logger if not already added
+        if not self.error_logger.handlers:
+            self.error_logger.addHandler(file_handler)
+        
+        # Set LiteLLM to use our error logger
+        litellm.logger = self.error_logger
 
 
     def complete(self, messages: List[Message], tools: Optional[List[Dict[str, Any]]] = None,
@@ -78,7 +108,18 @@ class LiteLlmModel(LlmModel):
         
         # Measure latency
         start_time = time.time()
-        response = completion(**completion_kwargs)
+        try:
+            response = completion(**completion_kwargs)
+        except Exception as e:
+            # Log the error with context
+            self.error_logger.error(f"LiteLLM completion error: {str(e)}", extra={
+                'model': self.model,
+                'temperature': self.temperature,
+                'max_tokens': self.max_tokens,
+                'tools_count': len(tools) if tools else 0,
+                'messages_count': len(formatted_messages)
+            })
+            raise  # Re-raise the exception to maintain existing behavior
         end_time = time.time()
         latency = end_time - start_time
         
@@ -195,7 +236,18 @@ class LiteLlmModel(LlmModel):
         
         # Measure latency
         start_time = time.time()
-        response = await acompletion(**completion_kwargs)
+        try:
+            response = await acompletion(**completion_kwargs)
+        except Exception as e:
+            # Log the error with context
+            self.error_logger.error(f"LiteLLM async completion error: {str(e)}", extra={
+                'model': self.model,
+                'temperature': self.temperature,
+                'max_tokens': self.max_tokens,
+                'tools_count': len(tools) if tools else 0,
+                'messages_count': len(formatted_messages)
+            })
+            raise  # Re-raise the exception to maintain existing behavior
         end_time = time.time()
         latency = end_time - start_time
         

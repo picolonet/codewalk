@@ -153,13 +153,14 @@ class LlmModel(ABC):
 
     @abstractmethod
     def complete(self, messages: List[Message], tools: Optional[List[Dict[str, Any]]] = None,
-        tool_choice: Optional[Union[str, Dict[str, Any]]] = None, **kwargs) -> LlmResponse:
+        tool_choice: Optional[Union[str, Dict[str, Any]]] = None, trace_name: Optional[str] = None, **kwargs) -> LlmResponse:
         """Completes a chat conversation using the configured LLM.
 
         Args:
             messages: List of Message objects representing the conversation history
             tools: Optional list of tool definitions that the model can use
             tool_choice: Optional specification of which tool the model should use
+            trace_name: Optional name of the trace to create in Langfuse
             **kwargs: Additional keyword arguments passed to the completion API
 
         Returns:

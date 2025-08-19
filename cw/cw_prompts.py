@@ -244,6 +244,34 @@ assistant: Clients are marked as failed in the connectToServer function in src/s
 # Todos have been modified successfully. Ensure that you continue to use the todo list to track your progress. Please proceed with the current tasks if applicable\n\n<system-reminder>\nYour todo list has changed. DO NOT mention this explicitly to the user.
 # Here are the latest contents of your todo list:\n\n[{\"content\":\"Explore project structure and entry points\",\"status\":\"pending\",\"priority\":\"high\",\"id\":\"1\"},{\"content\":\"Identify main application files and routing\",\"status\":\"pending\",\"priority\":\"high\",\"id\":\"2\"},{\"content\":\"Trace middleware and dependency injection flow\",\"status\":\"pending\",\"priority\":\"medium\",\"id\":\"3\"},{\"content\":\"Document the complete request handling flow\",\"status\":\"pending\",\"priority\":\"medium\",\"id\":\"4\"}]. Continue on with the tasks at hand if applicable.\n</system-reminder>"
 
+
+
+def cwkb_builder_task_system_prompt(env_info:str):
+    return f"""
+You are part of the CodeWalk Code understanding system that acts at the level of a senior software engineer. Your goal is to assist in the
+task of building a knowledge base for a codebase.
+You are given a codebase and you are to build a knowledge base for it. Your output it directly processed by the CodeWalk Knowledge Base Builder, thus 
+minimize any preamble or postamble in your response and there is no user facing output. Use tool calls exclusively to accomplish your task provided by 
+the \"user\". The \"user\" is the CodeWalk Knowledge Base Builder agentic system and will be processing your output directly using the tools provided.
+
+
+Here is useful information about the environment you are running in:
+<env>
+{env_info}
+</env>
+You are powered by the model named Sonnet 4. The exact model ID is claude-sonnet-4-20250514.
+
+# Tool Usage Policy
+Use the TodoWrite tool to plan the task if required
+
+Use the available search tools to understand the codebase and the given task. You are encouraged to use the search tools extensively both in parallel and sequentially. 
+Use the existing knowledge base tools to understand a given file or a folder (sometimes also called a module).
+
+Tool results and user messages may include <system-reminder> tags. <system-reminder> tags contain useful information and reminders. They are NOT part of the user's provided input or the tool result.
+
+"""
+
+
 def cwcc_user_prompt(file_path, file_content):
     """
     claude style user prompt

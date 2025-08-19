@@ -1,3 +1,4 @@
+
 # CodeWalk Repo
 
 Goal is to use agentic exploration for code understanding.
@@ -31,3 +32,21 @@ Goal is to use agentic exploration for code understanding.
 ### Sample Queries
 
 FastApi:  how does an api request get handled through various classes and functions in this project ?
+
+
+
+### TODOs:
+- A way to log stats: number of tokens (inp/out), number of LLM calls and cost for a given query or a task
+  such as KB construction.
+   - Create a tag and add stats to that tag. 
+      - CwTask changes to aggregate stats.
+      - command line to process query.
+      - Log tool calls, kb vs non-kb.
+   - TODO: Check stats and ensure that the operations tag is there. 
+- Print final kb buider message as a panel and save it ?
+- Aggregate stats across a CwTask for queries so we can benchmark. 
+- change router to save model config changes to the codewalk.conf file. 
+- move logging capability in lite_llm_model to base class. 
+- load codewlk.conf settings into cli.py
+- Test kb generation with Llama 4 and test 10M context window.
+- Run kb generation for fastapi.

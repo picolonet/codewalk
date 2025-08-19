@@ -1,11 +1,16 @@
+
+import os
+
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent))
+
 from llm.oai_model import OaiModel
 from llm.anthropic_model import AnthropicModel
 from llm.llama_model import LlamaModel, create_llama4_scout_model
 from llm.llm_model import LlmModel
 from llm.lite_llm_model import LiteLlmModel
 from dotenv import load_dotenv
-import os
-
 
 class LlmRouter:
     def __init__(self):
