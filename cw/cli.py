@@ -1,14 +1,14 @@
 
 
 import sys
+
 import argparse
 from pathlib import Path
+sys.path.append(str(Path(__file__).parent))
+sys.path.append(str(Path(__file__).parent / "cw"))
 
 from cw.code_walker2 import CodeWalker2
 from cw.kb.knowledge_base import build_knowledge_base_with_summary
-
-sys.path.append(str(Path(__file__).parent))
-sys.path.append(str(Path(__file__).parent / "cw"))
 
 
 from typing import Dict, Any, Optional
