@@ -50,11 +50,11 @@ FastApi:  how does an api request get handled through various classes and functi
       - CwTask changes to aggregate stats.
       - command line to process query.
       - Log tool calls, kb vs non-kb.
-   - TODO: Check stats and ensure that the operations tag is there. 
+- langfuse session tracking. observastions and multiple traces per trace. upgrade to new version and utilize llm-as-a-judge.
 - Print final kb buider message as a panel and save it ?
-- Aggregate stats across a CwTask for queries so we can benchmark. 
 - change router to save model config changes to the codewalk.conf file. 
 - move logging capability in lite_llm_model to base class. 
 - load codewlk.conf settings into cli.py
 - Test kb generation with Llama 4 and test 10M context window.
-- Run kb generation for fastapi.
+
+- Test q: How does request processing work in the current project ?

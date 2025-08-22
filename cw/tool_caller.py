@@ -6,7 +6,7 @@ import inspect
 from pydantic import BaseModel
 from util.livepanel import LivePanel
 from console_logger import console_logger
-from llm.llm_router import llm_router
+from cw.llm.llm_router import llm_router
 from util.cw_constants import IGNORE_FILE_LIST
 import os
 from llm.llm_common import CompletionResult
@@ -87,7 +87,7 @@ class ToolCaller:
             if param.default == inspect.Parameter.empty:
                 parameters["required"].append(param_name)
         
-        print(f"Registering tool: {name} with parameters: {parameters} and description: {description}\n")
+        # print(f"Registering tool: {name} with parameters: {parameters} and description: {description}\n")
         self.register_tool(name, description, parameters, function)
     
     def get_tool_schemas(self) -> List[Dict[str, Any]]:
@@ -140,7 +140,7 @@ class ToolCaller:
                            max_iterations: int = 5) -> List[Message]:
         """Complete a conversation with automatic tool execution."""
 
-        self.llm_model = llm_router().get()
+        self.llm_model = llm_router.get()
         conversation = messages.copy()
         
         for iteration in range(max_iterations):
@@ -181,7 +181,7 @@ class ToolCaller:
                            max_iterations: int = 50 ) -> CompletionResult:
         """Complete a conversation with automatic tool execution."""
 
-        self.llm_model = llm_router().get()
+        self.llm_model = llm_router.get()
 
         # Debug live panel to print each round of messages
         # self.start_debugpanel()
@@ -258,7 +258,7 @@ def get_file_contents(file_path: str) -> str:
 def list_directory(directory_path: str) -> str:
     """List files and directories in the given path."""
     actual_result = _list_directory_internal(directory_path)
-    result = f"Result of listing files in {directory_path}:\n<result>\n{actual_result}\n<\result>"
+    result = f"Result of listing files in {directory_path}:\n<result>\n{actual_result}\n<\\result>"
     return result
 
 def _list_directory_internal(directory_path: str) -> str:
@@ -276,7 +276,7 @@ def search_files(directory: str, pattern: str) -> str:
     """Search for files matching a pattern in a directory."""
 
     actual_result = _search_files_internal(directory, pattern)
-    result = f"Search result for files in {directory} matching {pattern}:\n<result>\n{actual_result}\n<\result>"
+    result = f"Search result for files in {directory} matching {pattern}:\n<result>\n{actual_result}\n<\\result>"
     return result
     
 def _search_files_internal(directory: str, pattern: str) -> str:

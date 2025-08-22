@@ -21,11 +21,12 @@ from rich.markdown import Markdown
 from rich import print as rprint
 from code_walker import code_walker
 from console_logger import console_logger
-from llm.llm_router import llm_router
+from cw.llm.llm_router import llm_router
 from cw.cw_task import CwTask
 from kb.kb_builder import KBBuilder
 import os
-from cw.cw_config import get_cw_config
+from cw.cw_config import get_cw_config, CwConfig
+from rich.markdown import Markdown
 
 
 
@@ -90,7 +91,7 @@ Use slash commands (/) for special operations.
         
         # Add current model to configuration display
         try:
-            router = llm_router()
+            router = llm_router
             current_model = router.get_current_model_name()
             table.add_row("current_model", current_model)
         except Exception:
@@ -193,7 +194,7 @@ Use slash commands (/) for special operations.
             return
         
         try:
-            router = llm_router()
+            router = llm_router
             current_model = router.get_current_model_name()
             
             # Set the new model using the router
@@ -209,6 +210,7 @@ Use slash commands (/) for special operations.
         except Exception as e:
             self.console.print(f"[red]Error switching to {model_type}: {str(e)}[/red]")
             self.console.print("Make sure you have the required API keys configured.")
+            raise e
     
     def run_codewalk(self, subdirectory: str = None):
         """Run codewalk on the specified directory or current directory if none specified."""
@@ -284,6 +286,12 @@ Use slash commands (/) for special operations.
             else:
                 self.console.print(f"[red]Failed to build knowledge base[/red]")
         
+
+    def process_query_for_cmdline(self, query: str):
+        code_walker2 = CodeWalker2(code_base_path=os.getcwd())
+        full_response = code_walker2.run_query(query, operation_tag=f"user_query_{self.query_count}")
+        response = full_response.user_facing_result
+        return response, full_response
     
     def process_query(self, query: str):
         """Process a user query through the CodeWalker."""
@@ -292,20 +300,25 @@ Use slash commands (/) for special operations.
             #full_response = code_walker.run_query(query)
             # cw_task = CwTask(user_query=query, code_base_path=os.getcwd())
             #full_response = cw_task.run(query)
-            code_walker2 = CodeWalker2(code_base_path=os.getcwd())
-            full_response = code_walker2.run_query(query, operation_tag=f"user_query_{self.query_count}")
-            response = full_response.user_facing_result
+            # code_walker2 = CodeWalker2(code_base_path=os.getcwd())
+            # full_response = code_walker2.run_query(query, operation_tag=f"user_query_{self.query_count}")
+            # response = full_response.user_facing_result
              # Display the response in a panel
-            console_logger.log_text_panel(response, title="Response", type="from_llm")
+           
+            user_facing_result, full_response = self.process_query_for_cmdline(query)
+            console_logger.log_text_panel(user_facing_result, title="Response", type="from_llm")
 
         last_response = full_response.last_response
         if hasattr(last_response, 'content') and last_response.content:
+            content = last_response.content if last_response.content else "No response"
+            markdown_content = Markdown(content)
             self.console.print(Panel(
-                last_response.content if last_response.content else "No response",
+                markdown_content,
                 title="Response",
                 border_style="blue",
                 padding=(1, 2)
             ))
+    
     
     def run(self):
         """Main interaction loop."""
@@ -339,7 +352,8 @@ Use slash commands (/) for special operations.
                 self.console.print("\n[yellow]Goodbye![/yellow]")
                 break
             except Exception as e:
-                self.console.print(f"[red]Error: {e}[/red]")
+                self.console.print("[red]Error: [/red]")
+                print(str(e))
                 raise
 
 
@@ -353,7 +367,16 @@ def main():
     
     if args.query:
         # Direct query mode - process and exit
-        cli.process_query(args.query)
+        user_facing_result, full_response = cli.process_query_for_cmdline(args.query)
+        # Save output to file specified in config
+
+        config = get_cw_config()
+        output_file = config.get(CwConfig.OUTPUT_FILE_KEY, CwConfig.OUTPUT_FILE_DEFAULT)
+        
+        with open(output_file, 'w', encoding='utf-8') as f:
+            f.write(user_facing_result)
+        
+        print(user_facing_result)
     else:
         # Interactive REPL mode
         cli.run()

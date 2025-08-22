@@ -31,6 +31,7 @@ class LlamaModel(LlmModel):
             temperature: Sampling temperature (0.0 to 2.0)
             max_tokens: Maximum tokens to generate
         """
+        super().__init__(model_name=model)
         self.model = model
         self.temperature = temperature
         self.max_tokens = max_tokens
@@ -66,22 +67,32 @@ class LlamaModel(LlmModel):
         return "llama"
 
     def complete(self, messages: List[Message], tools: Optional[List[Dict[str, Any]]] = None,
-                tool_choice: Optional[Union[str, Dict[str, Any]]] = None, **kwargs) -> LlmResponse:
+                tool_choice: Optional[Union[str, Dict[str, Any]]] = None,  trace_name: Optional[str] = None, **kwargs) -> LlmResponse:
         """Synchronous completion using the configured provider."""
+
+        # Create Langfuse trace
+        formatted_messages = self._format_messages(messages)
+        trace = self._create_trace(name=trace_name or "llm_completion")
+        generation = self._trace_generation(trace=trace, name="litellm_completion", model=self.model, formatted_messages=formatted_messages,
+            temperature=self.temperature, max_tokens=self.max_tokens, tools=tools, tool_choice=tool_choice)
+        
         try:
             response = self.provider.complete(messages, tools=tools, tool_choice=tool_choice, **kwargs)
+            message_content = response.content
             
             # Debug logging
             self._debug_print_llm_response(response)
             data_logger = get_data_logger()
-            data_logger.log_stats(self.model_name(), prompt_tokens=response.get_prompt_tokens(),
+            data_logger.log_stats(self.get_model_name(), prompt_tokens=response.get_prompt_tokens(),
                  completion_tokens=response.get_completion_tokens(), latency_seconds=response.get_latency_seconds(),
                   operation="tool_call" if tools != None else "completion")
-            
+
+            self._trace_end(generation=generation, output=message_content, prompt_tokens=response.get_prompt_tokens(),
+            completion_tokens=response.get_completion_tokens(), total_tokens=response.get_total_tokens())
             return response
             
         except Exception as e:
-            console_logger.log(f"Error in Llama completion: {str(e)}", "error")
+            console_logger.log_text(f"Error in Llama completion: {str(e)}", "error")
             raise
 
     async def async_complete(self, messages: List[Message], tools: Optional[List[Dict[str, Any]]] = None,
@@ -96,7 +107,7 @@ class LlamaModel(LlmModel):
             return response
             
         except Exception as e:
-            console_logger.log(f"Error in Llama async completion: {str(e)}", "error")
+            console_logger.log_text(f"Error in Llama async completion: {str(e)}", "error")
             raise
 
     def stream_complete(self, messages: List[Message], tools: Optional[List[Dict[str, Any]]] = None,
@@ -106,7 +117,7 @@ class LlamaModel(LlmModel):
             return self.provider.stream_complete(messages, tools=tools, tool_choice=tool_choice, **kwargs)
             
         except Exception as e:
-            console_logger.log(f"Error in Llama streaming: {str(e)}", "error")
+            console_logger.log_text(f"Error in Llama streaming: {str(e)}", "error")
             raise
 
     def get_provider_info(self) -> Dict[str, Any]:
@@ -138,6 +149,7 @@ def create_llama4_scout_model(api_key: Optional[str] = None,
                              temperature: float = 0.7,
                              max_tokens: Optional[int] = None) -> LlamaModel:
     """Create a LlamaModel specifically for Llama4 Scout using Groq."""
+    print(f"Creating Llama4 Scout model.")
     return LlamaModel(
         provider_type="groq",
         model="meta-llama/llama-4-scout-17b-16e-instruct",

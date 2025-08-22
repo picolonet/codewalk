@@ -1,6 +1,6 @@
 
 import os
-
+import traceback
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
@@ -18,6 +18,7 @@ class LlmRouter:
         self.oai_model = None
         self.anthropic_model = None
         self.llama_model = None
+        # traceback.print_stack(limit=15)  # prints recent calls
 
     def openai(self):
         load_dotenv()
@@ -59,14 +60,14 @@ class LlmRouter:
 
     def get(self):
         if not self.llm_model:
-            return self.lite_llm()
+            return self.llama4() # changed from self.lite_llm()
         return self.llm_model
     
     def get_current_model_name(self) -> str:
         """Get the name of the currently active model."""
         if not self.llm_model:
             return "lite_llm"
-        return self.llm_model.model_name()
+        return self.llm_model.get_model_name()
     
     def set_model(self, model_type: str):
         """Set the model type. Valid types: 'oai', 'claude', 'llama'."""
@@ -82,10 +83,14 @@ class LlmRouter:
         else:
             raise ValueError(f"Unknown model type: {model_type}. Valid types: 'oai', 'claude', 'llama'")
 
-_global_llm_router = None
 
-def llm_router() -> LlmRouter:
-    global _global_llm_router
-    if _global_llm_router is None:
-        _global_llm_router = LlmRouter()
-    return _global_llm_router
+llm_router = LlmRouter()
+
+# _global_llm_router = None
+
+# def llm_router() -> LlmRouter:
+#     global _global_llm_router
+#     if _global_llm_router is None:
+#         print(f"Creating LlmRouter.")
+#         _global_llm_router = LlmRouter()
+#     return _global_llm_router

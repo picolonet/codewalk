@@ -200,6 +200,9 @@ class GroqLlamaProvider(LlamaProvider):
                 
             if tool_choice:
                 request_params["tool_choice"] = tool_choice
+
+            with open("groq_output.txt", "a") as f:
+                print(f"GROQ request_params: {request_params}", file=f)
             
             # Make the API call
             response = self.client.chat.completions.create(**request_params)
@@ -210,7 +213,7 @@ class GroqLlamaProvider(LlamaProvider):
             return llm_response
             
         except Exception as e:
-            console_logger.log(f"Error in Groq completion: {str(e)}", "error")
+            console_logger.log_text(f"Error in Groq completion: {str(e)}", "error")
             raise
 
     async def async_complete(self, messages: List[Message], tools: Optional[List[Dict[str, Any]]] = None,
@@ -246,7 +249,7 @@ class GroqLlamaProvider(LlamaProvider):
             return llm_response
             
         except Exception as e:
-            console_logger.log(f"Error in Groq async completion: {str(e)}", "error")
+            console_logger.log_text(f"Error in Groq async completion: {str(e)}", "error")
             raise
 
     def stream_complete(self, messages: List[Message], tools: Optional[List[Dict[str, Any]]] = None,
@@ -276,7 +279,7 @@ class GroqLlamaProvider(LlamaProvider):
             return self.client.chat.completions.create(**request_params)
             
         except Exception as e:
-            console_logger.log(f"Error in Groq streaming: {str(e)}", "error")
+            console_logger.log_text(f"Error in Groq streaming: {str(e)}", "error")
             raise
 
 

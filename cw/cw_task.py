@@ -176,7 +176,7 @@ class CwTask:
                            max_iterations: int = 50 ) -> CompletionResult:
         """Complete a conversation with automatic tool execution."""
 
-        self.llm_model = llm_router().get()
+        self.llm_model = llm_router.get()
 
         # Debug live panel to print each round of messages
         # self.start_debugpanel()

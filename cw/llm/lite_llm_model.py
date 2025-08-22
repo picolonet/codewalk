@@ -15,7 +15,6 @@ from llm.llm_model import LlmModel, Message, LlmResponse
 from llm.llm_common import ToolCall, ToolCallResponse
 
 
-
 class LiteLlmModel(LlmModel):
     def __init__(self, model: str, api_key: Optional[str] = None, base_url: Optional[str] = None,
      temperature: float = 0.7, max_tokens: Optional[int] = None):
@@ -34,29 +33,14 @@ class LiteLlmModel(LlmModel):
             litellm.api_key = api_key
         if base_url:
             litellm.api_base = base_url
+
+        self.custom_headers = {
+            "anthropic-beta": "prompt-caching-2024-07-31",
+        }
             
     def _setup_litellm_logging(self):
         """Setup LiteLLM logging to capture errors to a file in logs/ directory"""
-        # Ensure logs directory exists
-        os.makedirs("logs", exist_ok=True)
-        
-        # Create a logger for LiteLLM errors
-        self.error_logger = logging.getLogger('litellm_errors')
-        self.error_logger.setLevel(logging.ERROR)
-        
-        # Create file handler for error logs
-        error_log_file = f"logs/litellm_errors_{datetime.now().strftime('%Y%m%d')}.log"
-        file_handler = logging.FileHandler(error_log_file)
-        file_handler.setLevel(logging.ERROR)
-        
-        # Create formatter
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        file_handler.setFormatter(formatter)
-        
-        # Add handler to logger if not already added
-        if not self.error_logger.handlers:
-            self.error_logger.addHandler(file_handler)
-        
+        self._setup_llm_logging()
         # Set LiteLLM to use our error logger
         litellm.logger = self.error_logger
 
@@ -90,6 +74,7 @@ class LiteLlmModel(LlmModel):
             "messages": formatted_messages,
             "temperature": self.temperature,
             "stream": False,  # Always non-streaming in complete()
+            "headers": self.custom_headers,
             **kwargs
         }
         

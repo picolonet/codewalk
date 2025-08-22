@@ -26,7 +26,7 @@ class LlmCompletion:
     def complete(self, query: Message, tool_choice: Optional[str] = "auto", trace_name: Optional[str] = None, operation_tag: Optional[str] = None, **kwargs) -> CompletionResult:
         """Complete a conversation with automatic tool execution."""
 
-        self.llm_model = llm_router().get()
+        self.llm_model = llm_router.get()
 
         LlmUtils.post_json("New Query", messages=[query], type="user")
 
@@ -86,6 +86,9 @@ class LlmCompletion:
             # Execute each tool call
             for tool_call in last_response.tool_calls:
                 # Log tool calls.
+                data_logger.update_inmemory_stats_with_tool_calls(self.aggregate_stats_key,
+                     tool_call.function.get("name", "unknown"))
+                console_logger.log_text_panel(f"Executing tool call: {tool_call.function.get('name', 'unknown')}", type="tool_call")
                 tool_response = self.tool_caller.execute_tool(tool_call)
                 
                 # Add tool response to conversation
@@ -101,6 +104,7 @@ class LlmCompletion:
         
         # Display final result to console.
         LlmUtils.post_json("LLM completion with tools result", current_result, type="from_llm")
+        data_logger.log_inmemory_stats(self.aggregate_stats_key)
         # self.stop_debugpanel()
         return CompletionResult(has_tool_calls=has_tool_calls, full_conversation=full_conversation,
                                  current_result=current_result, last_response=assistant_message,

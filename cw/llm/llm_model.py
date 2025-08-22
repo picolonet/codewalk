@@ -16,6 +16,8 @@ from dotenv import load_dotenv
 from cw.console_logger import console_logger
 from langfuse import Langfuse
 from llm.llm_common import Message, LlmResponse
+import logging
+from datetime import datetime
 
 
 def format_messages(messages: List[Message]) -> List[Dict[str, Any]]:
@@ -51,6 +53,28 @@ class LlmModel(ABC):
         # Initialize Langfuse for tracing
         self.langfuse = Langfuse()
 
+    def _setup_llm_logging(self):
+        """Setup LLM logging to capture errors to a file in logs/ directory"""
+        # Ensure logs directory exists
+        os.makedirs("logs", exist_ok=True)
+        
+        # Create a logger for LiteLLM errors
+        self.error_logger = logging.getLogger(f"{self.model_name}_errors")
+        self.error_logger.setLevel(logging.ERROR)
+        
+        # Create file handler for error logs
+        error_log_file = f"logs/{self.model_name}_llm_errors_{datetime.now().strftime('%Y%m%d')}.log"
+        file_handler = logging.FileHandler(error_log_file)
+        file_handler.setLevel(logging.ERROR)
+        
+        # Create formatter
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        file_handler.setFormatter(formatter)
+        
+        # Add handler to logger if not already added
+        if not self.error_logger.handlers:
+            self.error_logger.addHandler(file_handler)
+        
 
     def _format_messages(self, messages: List[Message]) -> List[Dict[str, Any]]:
         formatted_messages = []

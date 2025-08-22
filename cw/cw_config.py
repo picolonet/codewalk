@@ -12,6 +12,8 @@ class CwConfig:
     NUM_PARALLEL_DEFAULT = 4
     LLM_MODEL_KEY = "llm_model"
     LLM_MODEL_DEFAULT = "litellm"
+    OUTPUT_FILE_KEY = "output_file"
+    OUTPUT_FILE_DEFAULT = "codewalk_out.txt"
 
     VALID_MODELS = ["oai", "claude", "llama", "litellm"]
     

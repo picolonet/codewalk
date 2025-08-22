@@ -250,7 +250,7 @@ IMPORTANT: When the given summary task is complete, write your output using a wr
 
 def build_knowledge_base_with_summary(kb_root: str, max_workers: int = 4) -> Optional[KnowledgeBase]:
     """Build the knowledge base with a summary."""
-    kb_builder = KBBuilder(llm_router().get())
+    kb_builder = KBBuilder(llm_router.get())
     kb_parent = Path(kb_root).parent
     console_logger.log_text(f"Building knowledge base with {max_workers} workers")
     kb_builder.build_knowledge_base_topsort(root_path=str(kb_parent), num_parallel=max_workers)

@@ -111,21 +111,51 @@ class DataLogger:
             self.inmemory_stats[stats_key]["completion_tokens"] += completion_tokens
             self.inmemory_stats[stats_key]["latency_seconds"] += latency_seconds
 
-    def update_inmemory_stats_with_tool_calls(self, stats_key: str):
-        pass
+    def update_inmemory_stats_with_tool_calls(self, stats_key: str, tool_name: str):
+        if stats_key not in self.inmemory_stats:
+            return
+        
+        if tool_name not in self.inmemory_stats[stats_key]:
+            self.inmemory_stats[stats_key][tool_name] = 1
+        else:
+            self.inmemory_stats[stats_key][tool_name] += 1
+        
 
     def log_inmemory_stats(self, stats_key: str):
         if stats_key not in self.inmemory_stats:
             return
         
         stat_entry = self.inmemory_stats[stats_key]
+        get_file_summary_count = stat_entry.get("get_file_summary", 0)
+        get_module_summary_count = stat_entry.get("get_module_summary", 0)
+        get_module_metadata_count = stat_entry.get("get_module_metadata", 0)
+        list_modules_count = stat_entry.get("list_modules", 0)
+        list_files_count = stat_entry.get("list_files", 0)
+        module_exists_count = stat_entry.get("module_exists", 0)
+        file_has_summary_count = stat_entry.get("file_has_summary", 0)
+        get_file_contents_count = stat_entry.get("get_file_contents", 0)
+        list_directory_count = stat_entry.get("list_directory", 0)
+        search_files_count = stat_entry.get("search_files", 0)
+        todo_write_count = stat_entry.get("todo_write", 0)
+
         self.log_stats(
             model_name=stat_entry["model_name"],
             prompt_tokens=stat_entry["prompt_tokens"],
             completion_tokens=stat_entry["completion_tokens"],
             latency_seconds=stat_entry["latency_seconds"],
             operation=stat_entry["operation"],
-            stats_type="AGGREGATED"
+            stats_type="AGGREGATED",
+            get_file_summary_count=get_file_summary_count,
+            get_module_summary_count=get_module_summary_count,
+            get_module_metadata_count=get_module_metadata_count,
+            list_modules_count=list_modules_count,
+            list_files_count=list_files_count,
+            module_exists_count=module_exists_count,
+            file_has_summary_count=file_has_summary_count,
+            get_file_contents_count=get_file_contents_count,
+            list_directory_count=list_directory_count,
+            search_files_count=search_files_count,
+            todo_write_count=todo_write_count
         )
         del self.inmemory_stats[stats_key]
 

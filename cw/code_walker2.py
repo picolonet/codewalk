@@ -5,8 +5,8 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 from cw.cw_task import CwTask
 from cw.util.cw_common import get_env
-from llm.llm_router import llm_router
-from llm.llm_model import Message
+from cw.llm.llm_router import llm_router
+from cw.llm.llm_model import Message
 from tool_caller import ToolCaller, get_file_contents, list_directory, search_files
 from console_logger import console_logger
 from cw_prompts import cw_analyze_file_prompt, cwcc_system_prompt, cwkb_builder_task_system_prompt
@@ -96,7 +96,7 @@ class CodeWalker2:
     
     def _generate_file_summary(self, file_path: str) -> str:
         """Generate a summary of the file using LLM."""
-        llm_model = llm_router().get()
+        llm_model = llm_router.get()
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 file_content = f.read()
@@ -175,7 +175,7 @@ class CodeWalker2:
         
     async def _generate_file_summary_async(self, file_path: str) -> str:
         """Generate a summary of the file using LLM asynchronously."""
-        llm_model = llm_router().get()
+        llm_model = llm_router.get()
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 file_content = f.read()
