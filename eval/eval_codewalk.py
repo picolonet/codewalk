@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Evaluation script for FastAPI Q&A using codewalk.
-Loads fastapi_qa.yaml, runs codewalk queries, and appends results.
+Loads eval_qa.yaml, runs codewalk queries, and appends results.
 """
 
 import subprocess
@@ -56,7 +56,7 @@ def run_codewalk_query(question):
 
 def main():
     """Main evaluation function."""
-    qa_file_path = Path(__file__).parent / 'fastapi_qa.yaml'
+    qa_file_path = Path(__file__).parent / 'eval_qa.yaml'
     
     if not qa_file_path.exists():
         print(f"Error: {qa_file_path} not found")
