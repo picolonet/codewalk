@@ -7,7 +7,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 from llm.oai_model import OaiModel
 from llm.anthropic_model import AnthropicModel
-from llm.llama_model import LlamaModel, create_llama4_scout_model
+from llm.llama_model import LlamaModel, create_groq_llama_model, create_llama4_scout_model
 from llm.llm_model import LlmModel
 from llm.lite_llm_model import LiteLlmModel
 from dotenv import load_dotenv
@@ -41,6 +41,7 @@ class LlmRouter:
         if not self.llama_model:
             api_key = os.getenv("GROQ_API_KEY")
             self.llama_model = create_llama4_scout_model(api_key=api_key)
+            self.llama_model = create_groq_llama_model(api_key=api_key)
         self.llm_model = self.llama_model
         return self.llm_model
 

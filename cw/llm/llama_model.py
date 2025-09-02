@@ -9,7 +9,7 @@ from llm.llm_model import LlmModel, Message, LlmResponse
 from llm.llama_provider import LlamaProvider, GroqLlamaProvider, create_groq_llama_provider
 from cw.console_logger import console_logger
 from llm.llm_common import ToolCall
-
+from cw.cw_config import get_cw_config, CwConfig
 
 class LlamaModel(LlmModel):
     """Llama model implementation that uses pluggable LlamaProvider backends."""
@@ -136,6 +136,11 @@ def create_groq_llama_model(model: str = "meta-llama/llama-3.1-70b-versatile",
                            temperature: float = 0.7,
                            max_tokens: Optional[int] = None) -> LlamaModel:
     """Create a LlamaModel using Groq provider."""
+    cw_config = get_cw_config()
+    groq_model = cw_config.get(CwConfig.GROQ_MODEL_KEY, CwConfig.GROQ_MODEL_DEFAULT)
+    # if model is None:
+    #     model = groq_model  
+
     return LlamaModel(
         provider_type="groq",
         model=model,

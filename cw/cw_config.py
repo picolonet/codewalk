@@ -14,7 +14,8 @@ class CwConfig:
     LLM_MODEL_DEFAULT = "litellm"
     OUTPUT_FILE_KEY = "output_file"
     OUTPUT_FILE_DEFAULT = "codewalk_out.txt"
-
+    GROQ_MODEL_KEY = "groq_model"
+    GROQ_MODEL_DEFAULT = "groq/llama-3.1-70b-versatile"
     VALID_MODELS = ["oai", "claude", "llama", "litellm"]
     
     def __init__(self, config_file_path: Optional[str] = None):
