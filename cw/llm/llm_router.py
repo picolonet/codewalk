@@ -61,7 +61,7 @@ class LlmRouter:
 
     def get(self):
         if not self.llm_model:
-            return self.llama4() # changed from self.lite_llm()
+            return self.lite_llm() # changed from self.lite_llm()
         return self.llm_model
     
     def get_current_model_name(self) -> str:
