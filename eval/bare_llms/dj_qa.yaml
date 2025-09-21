@@ -5101,7 +5101,7 @@ questions:
         Complexity: high
         Architectural Insights: ["Implements the Registry pattern as Django's central application management system", 'Uses multi-phase loading to handle circular dependencies between apps and models', 'Employs lazy operation queuing to defer model-dependent operations until dependencies are satisfied', 'Thread-safety through RLock ensures safe concurrent access during server initialization', "The all_models mapping serves as Django's ORM foundation, enabling reverse relationships and model introspection", 'Stack-based configuration management enables testing isolation through temporary registry states', "Event-driven readiness signaling supports Django's autoreloader and development server features"] 
     codefusion_gpt-5_answer: |
-  - question: How does template inheritance work with block resolution and the extends mechanism?
+  - question: How does template inheritance work with block resolution and the extends mechanism in the Django codebase ?
     reference_answer: | 
       Django's template inheritance system is a powerful feature that promotes code reusability and consistency across web pages by allowing developers to define a base template with common structure and then extend it in child templates.11 This mechanism is analogous to class inheritance in object-oriented programming.
       The core of template inheritance revolves around two key template tags: {% extends %} and {% block %}.

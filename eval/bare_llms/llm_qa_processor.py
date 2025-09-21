@@ -9,10 +9,11 @@ from llm_providers import GroqProvider, OpenAIProvider, ClaudeProvider
 # I am using the latest available models as placeholders.
 # You can update the model names here when they become available.
 LLM_MODELS = {
-    "groq_llama3": GroqProvider(model="llama3-70b-8192"),
+    "groq_llama4": GroqProvider(model="meta-llama/llama-4-maverick-17b-128e-instruct"),
+    "groq_llama3": GroqProvider(model="llama-3.3-70b-versatile"),
     # "groq_llama4": GroqProvider(model="llama4-placeholder"), # Placeholder for Llama 4
-    "openai_gpt4o": OpenAIProvider(model="gpt-4o"), # Placeholder for GPT-5
-    "claude_sonnet": ClaudeProvider(model="claude-3-sonnet-20240229"),
+    "openai_gpt4o": OpenAIProvider(model="gpt-5"), # Placeholder for GPT-5
+    "claude_sonnet": ClaudeProvider(model="claude-sonnet-4-20250514"),
 }
 
 INPUT_YAML_FILE = 'dj_qa.yaml'
