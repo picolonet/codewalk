@@ -284,7 +284,7 @@ class GroqLlamaProvider(LlamaProvider):
 
 
 # Example usage and factory function
-def create_groq_llama_provider(model: str = "meta-llama/llama-3.1-70b-versatile", 
+def create_groq_llama_provider(model: str = "meta-llama/llama-4-maverick-17b-128e-instruct", 
                               api_key: Optional[str] = None,
                               temperature: float = 0.7,
                               max_tokens: Optional[int] = None) -> GroqLlamaProvider:

@@ -40,7 +40,7 @@ class LlmRouter:
         load_dotenv()
         if not self.llama_model:
             api_key = os.getenv("GROQ_API_KEY")
-            self.llama_model = create_llama4_scout_model(api_key=api_key)
+            #self.llama_model = create_llama4_scout_model(api_key=api_key)
             self.llama_model = create_groq_llama_model(api_key=api_key)
         self.llm_model = self.llama_model
         return self.llm_model

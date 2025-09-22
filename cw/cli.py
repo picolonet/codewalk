@@ -364,6 +364,7 @@ def main():
     args = parser.parse_args()
     
     cli = CodeWalkCli()
+    cli.set_model("llama")
     
     if args.query:
         # Direct query mode - process and exit
