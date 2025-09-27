@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
+from cw.llm.azure_oai_model import AzureOpenAIModel
 from llm.oai_model import OaiModel
 from llm.anthropic_model import AnthropicModel
 from llm.llama_model import LlamaModel, create_groq_llama_model, create_llama4_scout_model
@@ -27,6 +28,15 @@ class LlmRouter:
             self.oai_model = OaiModel(model="gpt-4o", api_key=api_key)
         self.llm_model = self.oai_model
         return self.llm_model
+
+    def azure_oai(self):
+        load_dotenv()
+        if not self.azure_oai_model:
+            api_key = os.getenv("AZURE_OPENAI_API_KEY")
+            azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
+            self.azure_oai_model = AzureOpenAIModel(api_key=api_key, azure_endpoint=azure_endpoint)
+        self.llm_model = self.azure_oai_model
+        return self.llm_model
     
     def anthropic(self):
         load_dotenv()
@@ -47,9 +57,9 @@ class LlmRouter:
 
     def lite_llm(self):
         load_dotenv()
-        api_key = os.environ.get("CODEWALKER_API_KEY")
-        base_url = os.environ.get("CODEWALKER_BASE_URL")
-        model_name = os.environ.get("CODEWALKER_MODEL_NAME") or "gpt-3.5-turbo"
+        api_key = os.environ.get("ANTHROPIC_API_KEY")
+        base_url = os.environ.get("ANTHROPIC_BASE_URL")
+        model_name = os.environ.get("ANTHROPIC_MODEL_NAME") or "gpt-3.5-turbo"
 
         lite_llm = LiteLlmModel(
             model=model_name,
@@ -71,7 +81,7 @@ class LlmRouter:
         return self.llm_model.get_model_name()
     
     def set_model(self, model_type: str):
-        """Set the model type. Valid types: 'oai', 'claude', 'llama'."""
+        """Set the model type. Valid types: 'oai', 'claude', 'llama', 'litellm', 'azure_oai'."""
         model_type = model_type.lower()
         if model_type == "oai":
             return self.openai()
@@ -80,9 +90,11 @@ class LlmRouter:
         elif model_type == "llama":
             return self.llama4()
         elif model_type == "litellm":
-            return self.lite_llm()
+            return self.lite_llm()  
+        elif model_type == "azure_oai":
+            return self.azure_oai()
         else:
-            raise ValueError(f"Unknown model type: {model_type}. Valid types: 'oai', 'claude', 'llama'")
+            raise ValueError(f"Unknown model type: {model_type}. Valid types: 'oai', 'claude', 'llama', 'litellm', 'azure_oai'")
 
 
 llm_router = LlmRouter()

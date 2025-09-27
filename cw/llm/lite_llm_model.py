@@ -284,9 +284,9 @@ class LiteLlmModel(LlmModel):
 
 # Get API key from .env file
 load_dotenv()
-api_key = os.environ.get("CODEWALKER_API_KEY")
-base_url = os.environ.get("CODEWALKER_BASE_URL")
-model_name = os.environ.get("CODEWALKER_MODEL_NAME") or "gpt-3.5-turbo"
+api_key = os.environ.get("ANTHROPIC_API_KEY")
+base_url = os.environ.get("ANTHROPIC_BASE_URL")
+model_name = os.environ.get("ANTHROPIC_MODEL_NAME") or "gpt-3.5-turbo"
 
 lite_llm = LiteLlmModel(
     model=model_name,
