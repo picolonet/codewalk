@@ -19,6 +19,11 @@ cd repo_of_interest
 codewalk
 ```
 
+## Set the default model
+
+Use `/model` to change the default model. Or in `llm_router.py get() function`. Change its return value. 
+Currently in `cli.py:: main()` we set the default model to `llama`. This can be changed as well.
+
 ## Thoughts on agentic exploration of a codebase
 1. Create a summary of knowns and unknowns for each file. 
   Pass in a running high level architecture (so far) of the project to help with this summary.
