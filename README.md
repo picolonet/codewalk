@@ -8,6 +8,7 @@ Goal is to use agentic exploration for code understanding. Based on the design o
 
 ```
 python -m venv .venv
+./venv/bin/activate
 pip install -r requirements.txt
 
 pip install -e . # to install codewalk as an editable dependency
