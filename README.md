@@ -6,8 +6,18 @@ Goal is to use agentic exploration for code understanding. Based on the design o
 
 ## Steps to run
 
-langfuse-2.60.9
-pip install "langfuse<3.0.0"
+```
+python -m venv .venv
+pip install -r requirements.txt
+
+pip install -e . # to install codewalk as an editable dependency
+
+cp .env.sample .env  # ensure .env has appropriate keys, at minimum langfuse (free api key). Create a langfuse tracing project and get a key.
+
+cd repo_of_interest
+
+codewalk
+```
 
 ## Thoughts on agentic exploration of a codebase
 1. Create a summary of knowns and unknowns for each file. 
