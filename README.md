@@ -1,11 +1,15 @@
 
 # CodeWalk Repo
 
-Goal is to use agentic exploration for code understanding.
+Goal is to use agentic exploration for code understanding. Based on the design of claude code and similar CLIs.
 
+
+## Steps to run
+
+langfuse-2.60.9
+pip install "langfuse<3.0.0"
 
 ## Thoughts on agentic exploration of a codebase
-
 1. Create a summary of knowns and unknowns for each file. 
   Pass in a running high level architecture (so far) of the project to help with this summary.
 
