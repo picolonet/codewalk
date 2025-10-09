@@ -17,6 +17,10 @@ class CwConfig:
     GROQ_MODEL_KEY = "groq_model"
     GROQ_MODEL_DEFAULT = "groq/llama-3.1-70b-versatile"
     VALID_MODELS = ["oai", "claude", "llama", "litellm"]
+    KB_ENABLED_KEY = "kb_enabled"
+    KB_ENABLED_DEFAULT = "false"
+    KB_ENABLED_VALUE = "true"
+    KB_ENABLED_VALUES =  ["true", "false"]
     
     def __init__(self, config_file_path: Optional[str] = None):
         """Initialize configuration loader.

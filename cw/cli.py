@@ -296,7 +296,7 @@ Use slash commands (/) for special operations.
     def process_query(self, query: str):
         """Process a user query through the CodeWalker."""
         self.query_count += 1
-        with self.console.status("[bold green]Processing query...", spinner="dots"):
+        with self.console.status("[bold green]Processing query...\n", spinner="dots"):
             #full_response = code_walker.run_query(query)
             # cw_task = CwTask(user_query=query, code_base_path=os.getcwd())
             #full_response = cw_task.run(query)

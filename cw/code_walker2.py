@@ -3,6 +3,7 @@ import fnmatch
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
+from cw import cw_config
 from cw.cw_task import CwTask
 from cw.util.cw_common import get_env
 from cw.llm.llm_router import llm_router
@@ -20,6 +21,7 @@ class CodeWalker2:
         self.code_base_path = code_base_path
         # Initialize knowledge base
         kb_path = os.path.join(self.code_base_path, CODEWALKER_KB_PREFIX)
+        self.kb_enabled = cw_config.get_cw_config().get(cw_config.CwConfig.KB_ENABLED_KEY, cw_config.CwConfig.KB_ENABLED_DEFAULT) == cw_config.CwConfig.KB_ENABLED_VALUE
         
         # Import KnowledgeBase here to avoid circular imports
         from cw.kb.knowledge_base import KnowledgeBase
@@ -46,13 +48,16 @@ class CodeWalker2:
             operation_tag=operation_tag
         )
         tool_caller = query_task.get_tool_caller()
-        tool_caller.register_tool_from_function(self.kb.get_module_summary)
-        tool_caller.register_tool_from_function(self.kb.get_file_summary) 
-        tool_caller.register_tool_from_function(self.kb.get_module_metadata)
-        tool_caller.register_tool_from_function(self.kb.list_modules)
-        tool_caller.register_tool_from_function(self.kb.list_files)
-        tool_caller.register_tool_from_function(self.kb.module_exists)
-        tool_caller.register_tool_from_function(self.kb.file_has_summary)
+        if (self.kb_enabled):
+            tool_caller.register_tool_from_function(self.kb.get_module_summary)
+            tool_caller.register_tool_from_function(self.kb.get_file_summary) 
+            tool_caller.register_tool_from_function(self.kb.get_module_metadata)
+            tool_caller.register_tool_from_function(self.kb.list_modules)
+            tool_caller.register_tool_from_function(self.kb.list_files)
+            tool_caller.register_tool_from_function(self.kb.module_exists)
+            tool_caller.register_tool_from_function(self.kb.file_has_summary)
+        else:
+            console_logger.log_text("Not registering knowledge base tools.")
         #tool_caller.register_tool_from_function(self.kb.write_kb_summary)
         return query_task.run(query)
     
