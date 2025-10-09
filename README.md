@@ -44,17 +44,10 @@ FastApi:  how does an api request get handled through various classes and functi
 
 
 ### TODOs:
-- A way to log stats: number of tokens (inp/out), number of LLM calls and cost for a given query or a task
-  such as KB construction.
-   - Create a tag and add stats to that tag. 
-      - CwTask changes to aggregate stats.
-      - command line to process query.
-      - Log tool calls, kb vs non-kb.
+- Ask Claude and GPT-5 how to design such a system and what tool calls to use. Should AST be part of this ?  
+- Clearly capture and record number of LLM calls and tokens (input/output). Thats a key metric to optimize. And the answer quality.
+- Print tool calling, assistant messages clearly and in log so one can understand the trace easily similar to claude-trace.
 - langfuse session tracking. observastions and multiple traces per trace. upgrade to new version and utilize llm-as-a-judge.
-- Print final kb buider message as a panel and save it ?
-- change router to save model config changes to the codewalk.conf file. 
 - move logging capability in lite_llm_model to base class. 
 - load codewlk.conf settings into cli.py
-- Test kb generation with Llama 4 and test 10M context window.
-
 - Test q: How does request processing work in the current project ?

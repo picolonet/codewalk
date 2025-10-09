@@ -38,7 +38,7 @@ class KBBuilder:
         default_ignores = {
             '.git', '.cw_kb', '__pycache__', '.pyc', '.pyo', 
             'node_modules', '.vscode', '.idea', '.DS_Store',
-            '*.log', '*.tmp', 'logs', 'temp'
+            '*.log', '*.tmp', 'logs', 'temp', '.venv', '.cw'
         }
         self.ignore_list.update(default_ignores)
         print(f"Ignore list: {self.ignore_list}")
