@@ -77,6 +77,7 @@ class LlamaModel(LlmModel):
             temperature=self.temperature, max_tokens=self.max_tokens, tools=tools, tool_choice=tool_choice)
         
         try:
+
             response = self.provider.complete(messages, tools=tools, tool_choice=tool_choice, **kwargs)
             message_content = response.content
             
