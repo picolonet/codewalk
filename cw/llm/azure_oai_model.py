@@ -15,11 +15,12 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from console_logger import console_logger
 
-
+0
 """
  Azure SDK: https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/reasoning?
  https://arune-mfpva4eo-eastus2.cognitiveservices.azure.com/openai/deployments/gpt-5/chat/completions?api-version=2025-01-01-preview
 
+Rate limit:  https://aka.ms/oai/quotaincrease.
 """
 class AzureOpenAIModel(LlmModel):
     """Azure OpenAI implementation of the LlmModel interface using the official Azure OpenAI Python SDK."""

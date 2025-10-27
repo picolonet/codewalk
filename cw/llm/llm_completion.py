@@ -62,7 +62,7 @@ class LlmCompletion:
                 last_response.get_latency_seconds(), operation=operation_tag)
             
             if last_response.content:
-                user_facing_result = last_response.content
+                self.user_facing_result = last_response.content
       
             # Add assistant message to conversation
             assistant_message = Message(
@@ -108,4 +108,4 @@ class LlmCompletion:
         # self.stop_debugpanel()
         return CompletionResult(has_tool_calls=has_tool_calls, full_conversation=full_conversation,
                                  current_result=current_result, last_response=assistant_message,
-                                 user_facing_result=user_facing_result)
+                                 user_facing_result=self.user_facing_result)

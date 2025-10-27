@@ -45,19 +45,20 @@ class KBBuilder:
     
     def _should_ignore(self, path: str, name: str) -> bool:
         """Check if a file or directory should be ignored.
-        
+
         Supports:
         - Exact name matches
-        - Wildcard patterns (* for glob matching)  
+        - Wildcard patterns (* for glob matching)
         - Regular expressions (patterns starting with 'regex:')
+        - File type filtering (only allows source code and documentation files)
         """
         # Check exact name matches
         if name in self.ignore_list:
             return True
-            
+
         # Get relative path for more comprehensive matching
         rel_path = os.path.relpath(path) if os.path.isabs(path) else path
-            
+
         # Check pattern matches
         for pattern in self.ignore_list:
             # Handle regex patterns
@@ -71,7 +72,7 @@ class KBBuilder:
                     if regex_pattern in name:
                         return True
                 continue
-            
+
             if fnmatch.fnmatch(rel_path, pattern) or fnmatch.fnmatch(os.path.basename(path), pattern):
                 return True
             # Handle wildcard patterns
@@ -84,12 +85,102 @@ class KBBuilder:
                         return True
                 else:
                     # Pattern has * in the middle - use simple glob matching
-  
+
                     if fnmatch.fnmatch(name, pattern) or fnmatch.fnmatch(rel_path, pattern):
                         return True
             elif pattern in name or pattern in rel_path:
                 return True
-                
+
+        # Only process files (not directories) with allowed extensions
+        if os.path.isfile(path):
+            # Define allowed extensions for source code and documentation
+            allowed_extensions = {
+                # Programming languages
+                '.py', '.pyw', '.pyx', '.pyi',  # Python
+                '.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs',  # JavaScript/TypeScript
+                '.java', '.kt', '.kts',  # Java/Kotlin
+                '.c', '.h', '.cpp', '.hpp', '.cc', '.cxx', '.hxx',  # C/C++
+                '.cs',  # C#
+                '.go',  # Go
+                '.rs',  # Rust
+                '.rb', '.rake',  # Ruby
+                '.php',  # PHP
+                '.swift',  # Swift
+                '.m', '.mm',  # Objective-C
+                '.scala', '.sc',  # Scala
+                '.clj', '.cljs', '.cljc',  # Clojure
+                '.lua',  # Lua
+                '.pl', '.pm',  # Perl
+                '.r', '.R',  # R
+                '.dart',  # Dart
+                '.ex', '.exs',  # Elixir
+                '.erl', '.hrl',  # Erlang
+                '.hs', '.lhs',  # Haskell
+                '.ml', '.mli',  # OCaml
+                '.nim',  # Nim
+                '.v', '.vh',  # Verilog
+                '.vhd', '.vhdl',  # VHDL
+
+                # Web/Markup/Config
+                '.html', '.htm', '.xhtml',  # HTML
+                '.css', '.scss', '.sass', '.less',  # CSS
+                '.xml', '.xsl', '.xsd',  # XML
+                '.json', '.jsonc', '.json5',  # JSON
+                '.yaml', '.yml',  # YAML
+                '.toml',  # TOML
+                '.ini', '.cfg', '.conf',  # Config files
+                '.properties',  # Properties
+                '.env.example', '.env.template',  # Example env files (not actual .env)
+
+                # Documentation
+                '.md', '.markdown', '.rst', '.txt', '.adoc', '.asciidoc',  # Documentation
+
+                # Shell/Scripts
+                '.sh', '.bash', '.zsh', '.fish', '.ksh',  # Shell scripts
+                '.bat', '.cmd', '.ps1',  # Windows scripts
+
+                # Build/Project files
+                '.gradle', '.maven', '.sbt',  # Build tools
+                '.cmake', '.make', '.mk',  # Make/CMake
+                'Makefile', 'makefile', 'GNUmakefile',  # Makefiles (no extension)
+                'Dockerfile', 'docker-compose.yml', 'docker-compose.yaml',  # Docker
+
+                # Data query/config
+                '.sql', '.hql', '.graphql', '.gql',  # Query languages
+
+                # Other
+                '.proto',  # Protocol Buffers
+                '.thrift',  # Thrift
+                '.tf',  # Terraform
+            }
+
+            # Special case: files without extensions that should be processed
+            no_extension_allowed = {
+                'Makefile', 'makefile', 'GNUmakefile',
+                'Dockerfile', 'Jenkinsfile', 'Vagrantfile',
+                'Rakefile', 'Gemfile', 'Podfile',
+                'LICENSE', 'README', 'CHANGELOG', 'CONTRIBUTING',
+                'AUTHORS', 'NOTICE', 'TODO',
+            }
+
+            # Check if file has no extension but is in allowed list
+            if '.' not in name or name.startswith('.'):
+                if name in no_extension_allowed:
+                    return False
+                # Ignore files without extension that aren't in the allowed list
+                return True
+
+            # Get file extension
+            _, ext = os.path.splitext(name)
+            ext_lower = ext.lower()
+
+            # Ignore binary and non-source files
+            if ext_lower not in allowed_extensions:
+                # Additional check for files that might be text but not in our list
+                # We'll be conservative and ignore them
+                return True
+
+
         return False
     
     def _create_file_summary(self, file_path: str, relative_path: str) -> str:
