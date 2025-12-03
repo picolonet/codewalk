@@ -135,10 +135,6 @@ class OaiModel(LlmModel):
             latency_seconds=latency
         )
 
-        
-    def model_name(self) -> str:
-        return "oai"
-
     def complete(self, messages: List[Message], tools: Optional[List[Dict[str, Any]]] = None,
                 tool_choice: Optional[Union[str, Dict[str, Any]]] = None, trace_name: Optional[str] = None, **kwargs) -> LlmResponse:
         """Synchronous completion using OpenAI models."""
@@ -187,7 +183,6 @@ class OaiModel(LlmModel):
             
             # Update Langfuse trace with results
             self._trace_end(
-                trace=trace, 
                 generation=generation, 
                 output=llm_response.content or "",
                 prompt_tokens=llm_response.get_prompt_tokens(),
@@ -198,14 +193,14 @@ class OaiModel(LlmModel):
             # Debug logging
             self._debug_print_llm_response(llm_response)
             data_logger = get_data_logger()
-            data_logger.log_stats(self.model_name(), prompt_tokens=llm_response.get_prompt_tokens(),
+            data_logger.log_stats(self.model_name, prompt_tokens=llm_response.get_prompt_tokens(),
                  completion_tokens=llm_response.get_completion_tokens(), latency_seconds=llm_response.get_latency_seconds(),
                   operation="tool_call" if tool_choice else "completion")
             
             return llm_response
             
         except Exception as e:
-            console_logger.log(f"Error in OpenAI completion: {str(e)}", "error")
+            console_logger.log_text(f"Error in OpenAI completion: {str(e)}", "error")
             raise
 
     async def async_complete(self, messages: List[Message], tools: Optional[List[Dict[str, Any]]] = None,

@@ -6,7 +6,7 @@ from typing import Dict, Any, Optional, Union
 from dataclasses import dataclass, asdict
 from pathlib import Path
 
-from llm.llm_model import LlmResponse
+from cw.llm.llm_model import LlmResponse
 
 
 @dataclass

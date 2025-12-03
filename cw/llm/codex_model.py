@@ -12,8 +12,8 @@ from openai.types.completion_usage import CompletionUsage
 from openai import OpenAI, AsyncOpenAI
 
 from cw.util.data_logger import get_data_logger
-from llm.llm_model import LlmModel, Message, LlmResponse
-from llm.llm_common import ToolCall
+from cw.llm.llm_model import LlmModel, Message, LlmResponse
+from cw.llm.llm_common import ToolCall
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from console_logger import console_logger

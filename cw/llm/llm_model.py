@@ -15,7 +15,7 @@ import time
 from dotenv import load_dotenv
 from cw.console_logger import console_logger
 from langfuse import Langfuse
-from llm.llm_common import Message, LlmResponse
+from cw.llm.llm_common import Message, LlmResponse
 import logging
 from datetime import datetime
 
