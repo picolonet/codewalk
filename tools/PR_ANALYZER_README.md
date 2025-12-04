@@ -96,9 +96,11 @@ python tools/pr_analyzer.py owner/repo \
 - `--state`: PR state to filter (choices: `open`, `closed`, `merged`, `all`, default: `closed`)
 - `--sort-by`: Sort PRs by date field (choices: `created`, `updated`, `merged`, `closed`, default: `created`). Always sorts newest first to prioritize recent PRs
 - `--cache-dir`: Directory to store cache files (default: `.pr_cache`)
-- `--no-cache`: Disable caching and always fetch fresh data
+- `--no-cache`: Disable PR data caching and always fetch fresh data from GitHub
 - `--resume`: Resume from previous analysis, skipping already analyzed PRs
-- `--clear-cache`: Clear the cache for this repository before running
+- `--clear-cache`: Clear the PR data cache for this repository before running
+- `--no-llm-cache`: Disable LLM result caching (always call LLM for analysis, even if cached)
+- `--clear-llm-cache`: Clear the LLM analysis cache for this repository before running
 - `--output`, `-o`: Output YAML file path (default: auto-generated with timestamp)
 
 ### Sorting Behavior
@@ -115,61 +117,94 @@ Sort options:
 
 ## Caching & Resume
 
-The tool includes intelligent caching to save time and API costs:
+The tool includes **two-tier intelligent caching** to maximize efficiency and minimize costs:
 
 ### How Caching Works
 
+**Tier 1: PR Data Cache**
 1. **Fetched PRs Cache**: When PRs are fetched from GitHub, they're stored in `.pr_cache/{owner}_{repo}_{state}_{sort_by}.json`
 2. **Analysis Cache**: As each PR is analyzed, the results are incrementally saved to the cache
 3. **Resume Support**: Use `--resume` to continue from where you left off if analysis was interrupted
+
+**Tier 2: LLM Results Cache (NEW!)**
+1. **Per-PR LLM Cache**: Each PR's LLM analysis is cached separately in `.pr_cache/llm_results/{owner}_{repo}/pr_{number}.json`
+2. **Smart Reuse**: Cached LLM results are reused across different analysis runs, even with different `--min-score` thresholds
+3. **Maximum Cost Savings**: Zero LLM API calls when analyzing the same PRs with different parameters
 
 ### Cache Benefits
 
 - **Avoid Re-fetching**: GitHub API calls are saved by reusing cached PR data
 - **Resume Long Operations**: Interrupt and resume analysis without losing progress
 - **Save LLM Costs**: Already-analyzed PRs are skipped when using `--resume`
-- **Incremental Updates**: Cache is updated after each PR analysis
+- **Reuse LLM Results**: Change `--min-score` without re-analyzing (zero LLM cost!)
+- **Incremental Updates**: Both caches are updated after each PR analysis
 
 ### Cache Usage Examples
 
 ```bash
-# First run: Fetch and analyze 100 PRs (creates cache)
+# First run: Fetch and analyze 100 PRs (creates both caches)
 python tools/pr_analyzer.py owner/repo --max-prs 100
 
-# Second run: Use cached PRs (no GitHub API calls)
+# Second run: Use cached PRs and LLM results (NO API calls!)
 python tools/pr_analyzer.py owner/repo --max-prs 100
 
-# Resume after interruption (skip already analyzed PRs)
+# Try different threshold: Uses LLM cache (zero LLM cost!)
+python tools/pr_analyzer.py owner/repo --max-prs 100 --min-score 8.0
+# Output: "Using cached LLM analysis for PR #123..."
+
+# Resume after interruption (skip already analyzed PRs, reuse LLM cache)
 python tools/pr_analyzer.py owner/repo --max-prs 100 --resume
 
-# Start fresh: Clear cache and re-analyze
-python tools/pr_analyzer.py owner/repo --max-prs 100 --clear-cache
+# Force fresh LLM analysis (keep PR cache)
+python tools/pr_analyzer.py owner/repo --clear-llm-cache
 
-# Disable caching entirely (always fetch fresh)
-python tools/pr_analyzer.py owner/repo --no-cache
+# Start completely fresh: Clear both caches
+python tools/pr_analyzer.py owner/repo --clear-cache --clear-llm-cache
+
+# Disable all caching (always fetch and analyze fresh)
+python tools/pr_analyzer.py owner/repo --no-cache --no-llm-cache
 ```
 
 ### Cache File Structure
 
-Cache files are stored in `.pr_cache/` directory:
+Cache files are stored in `.pr_cache/` directory with **two-tier structure**:
+
 ```
 .pr_cache/
-  └── owner_repo_closed_created.json  # Cache for specific repo/state/sort combination
+  ├── owner_repo_closed_created.json        # PR data cache (Tier 1)
+  └── llm_results/                          # LLM results cache (Tier 2)
+      └── owner_repo/
+          ├── pr_123.json                   # LLM analysis for PR #123
+          ├── pr_124.json                   # LLM analysis for PR #124
+          └── pr_125.json                   # LLM analysis for PR #125
 ```
 
-Each cache file contains:
+**Tier 1 Cache File** (`owner_repo_closed_created.json`) contains:
 - `fetched_prs`: Raw PR data from GitHub
 - `analyzed_prs`: PRs with LLM analysis results
 - `fetch_timestamp`: When PRs were fetched
 - `last_analysis_timestamp`: Last analysis time
 - Repository and filter metadata
 
+**Tier 2 Cache Files** (`llm_results/owner_repo/pr_*.json`) each contain:
+- `pr_number`: The PR number
+- `analysis`: Complete LLM analysis (score, summaries, elements)
+- `timestamp`: When analysis was performed
+
 ### When to Clear Cache
 
-Clear the cache when:
+**Clear PR cache (`--clear-cache`)** when:
 - You want to fetch the latest PRs from GitHub (new PRs may have been added)
-- Analysis parameters changed (different `--min-score`, `--model`, etc.)
-- You want to re-analyze PRs with a different LLM or prompt
+- Repository state changed significantly
+
+**Clear LLM cache (`--clear-llm-cache`)** when:
+- You want to re-analyze PRs with a different LLM model
+- You've updated the analysis prompt
+- PRs have been updated and you want fresh analysis
+
+**Clear both caches** when:
+- Starting completely fresh analysis
+- Switching to different repository branch or fork
 
 **Tip**: Cache files are keyed by `{owner}_{repo}_{state}_{sort_by}`, so changing `--state` or `--sort-by` creates a new cache file automatically.
 

@@ -39,7 +39,8 @@ class LlmRouter:
             api_key = os.getenv("AZURE_OPENAI_API_KEY")
             azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
             azure_api_version = os.getenv("AZURE_OPENAI_MODEL_API_VERSION")
-            self.azure_oai_model = AzureOpenAIModel(api_key=api_key, api_version=azure_api_version, azure_endpoint=azure_endpoint)
+            azure_oai_model = os.getenv("AZURE_OPENAI_MODEL")
+            self.azure_oai_model = AzureOpenAIModel(model=azure_oai_model, api_key=api_key, api_version=azure_api_version, azure_endpoint=azure_endpoint)
         self.llm_model = self.azure_oai_model
         return self.llm_model
 

@@ -33,7 +33,7 @@ class PRAnalyzer:
                  min_score: float = 7.0, max_prs: Optional[int] = None,
                  state: str = "closed", sort_by: str = "created",
                  cache_dir: str = ".pr_cache", use_cache: bool = True,
-                 resume: bool = False):
+                 resume: bool = False, use_llm_cache: bool = True):
         """
         Initialize the PR analyzer.
 
@@ -47,6 +47,7 @@ class PRAnalyzer:
             cache_dir: Directory to store cached PR data (default: '.pr_cache')
             use_cache: Whether to use caching (default: True)
             resume: Whether to resume from previous analysis (default: False)
+            use_llm_cache: Whether to cache LLM analysis results per PR (default: True)
         """
         self.repo_url = repo_url
         self.repo_owner, self.repo_name = self._parse_repo_url(repo_url)
@@ -56,6 +57,7 @@ class PRAnalyzer:
         self.sort_by = sort_by
         self.use_cache = use_cache
         self.resume = resume
+        self.use_llm_cache = use_llm_cache
 
         # Setup cache directory and file paths
         self.cache_dir = Path(cache_dir)
@@ -64,6 +66,10 @@ class PRAnalyzer:
         # Cache file naming: {owner}_{repo}_{state}_{sort_by}.json
         cache_filename = f"{self.repo_owner}_{self.repo_name}_{self.state}_{self.sort_by}.json"
         self.cache_file = self.cache_dir / cache_filename
+
+        # Setup LLM cache directory (per-PR analysis results)
+        self.llm_cache_dir = self.cache_dir / "llm_results" / f"{self.repo_owner}_{self.repo_name}"
+        self.llm_cache_dir.mkdir(parents=True, exist_ok=True)
 
         # Initialize LLM
         self.llm = llm_router.set_model(llm_model_type)
@@ -136,6 +142,53 @@ class PRAnalyzer:
             print(f"✓ Cleared cache: {self.cache_file}")
         else:
             print(f"No cache file found: {self.cache_file}")
+
+    def _get_llm_cache_file(self, pr_number: int) -> Path:
+        """Get the cache file path for a specific PR's LLM analysis."""
+        return self.llm_cache_dir / f"pr_{pr_number}.json"
+
+    def _load_llm_cache(self, pr_number: int) -> Optional[Dict[str, Any]]:
+        """Load cached LLM analysis for a specific PR."""
+        if not self.use_llm_cache:
+            return None
+
+        cache_file = self._get_llm_cache_file(pr_number)
+        if not cache_file.exists():
+            return None
+
+        try:
+            with open(cache_file, 'r', encoding='utf-8') as f:
+                cached_analysis = json.load(f)
+            return cached_analysis
+        except Exception as e:
+            print(f"Warning: Could not load LLM cache for PR #{pr_number}: {e}")
+            return None
+
+    def _save_llm_cache(self, pr_number: int, analysis: Dict[str, Any]):
+        """Save LLM analysis results for a specific PR."""
+        if not self.use_llm_cache:
+            return
+
+        cache_file = self._get_llm_cache_file(pr_number)
+        try:
+            with open(cache_file, 'w', encoding='utf-8') as f:
+                json.dump({
+                    'pr_number': pr_number,
+                    'analysis': analysis,
+                    'timestamp': datetime.now().isoformat()
+                }, f, indent=2)
+        except Exception as e:
+            print(f"Warning: Could not save LLM cache for PR #{pr_number}: {e}")
+
+    def clear_llm_cache(self):
+        """Clear all LLM cache files for this repository."""
+        if self.llm_cache_dir.exists():
+            import shutil
+            shutil.rmtree(self.llm_cache_dir)
+            self.llm_cache_dir.mkdir(parents=True, exist_ok=True)
+            print(f"✓ Cleared LLM cache: {self.llm_cache_dir}")
+        else:
+            print(f"No LLM cache directory found: {self.llm_cache_dir}")
 
     def fetch_prs(self) -> List[Dict[str, Any]]:
         """Fetch PRs from the repository using GitHub CLI.
@@ -239,6 +292,8 @@ class PRAnalyzer:
         """
         Use LLM to analyze a PR and score it for significance.
 
+        Checks LLM cache first to avoid redundant API calls.
+
         Returns a dict with:
             - significance_score (0-10)
             - feature_summary
@@ -246,7 +301,15 @@ class PRAnalyzer:
             - architectural_elements
             - reasoning
         """
-        print(f"Analyzing PR #{pr['number']}: {pr['title']}")
+        pr_number = pr['number']
+
+        # Check LLM cache first
+        cached_result = self._load_llm_cache(pr_number)
+        if cached_result:
+            print(f"Using cached LLM analysis for PR #{pr_number}: {pr['title']}")
+            return cached_result['analysis']
+
+        print(f"Analyzing PR #{pr_number}: {pr['title']}")
 
         # Prepare context for LLM
         pr_context = self._prepare_pr_context(pr)
@@ -302,13 +365,16 @@ Respond ONLY with valid JSON, no additional text."""
                              'architectural_elements', 'reasoning']
             for field in required_fields:
                 if field not in analysis:
-                    print(f"Warning: Missing field '{field}' in LLM response for PR #{pr['number']}")
+                    print(f"Warning: Missing field '{field}' in LLM response for PR #{pr_number}")
                     analysis[field] = "" if field != 'significance_score' else 0
+
+            # Save to LLM cache
+            self._save_llm_cache(pr_number, analysis)
 
             return analysis
 
         except json.JSONDecodeError as e:
-            print(f"Error parsing LLM response for PR #{pr['number']}: {e}")
+            print(f"Error parsing LLM response for PR #{pr_number}: {e}")
             print(f"Response was: {response_text[:500]}")
             return {
                 'significance_score': 0,
@@ -319,7 +385,7 @@ Respond ONLY with valid JSON, no additional text."""
                 'reasoning': f"JSON parse error: {str(e)}"
             }
         except Exception as e:
-            print(f"Error analyzing PR #{pr['number']}: {e}")
+            print(f"Error analyzing PR #{pr_number}: {e}")
             traceback.print_exc()
             raise e
             return {
@@ -557,14 +623,20 @@ Examples:
   # Analyze with custom settings
   python pr_analyzer.py owner/repo --model claude --min-score 8 --max-prs 50
 
-  # Resume from previous analysis (skip already analyzed PRs)
+  # Resume from previous analysis (skip already analyzed PRs, reuse LLM cache)
   python pr_analyzer.py owner/repo --resume
 
-  # Start fresh (clear cache and re-analyze)
-  python pr_analyzer.py owner/repo --clear-cache
+  # Start fresh (clear all caches and re-analyze)
+  python pr_analyzer.py owner/repo --clear-cache --clear-llm-cache
 
-  # Disable caching (always fetch fresh data)
-  python pr_analyzer.py owner/repo --no-cache
+  # Re-analyze with different threshold (uses LLM cache, no new API calls!)
+  python pr_analyzer.py owner/repo --min-score 8.0
+
+  # Force fresh LLM analysis (ignore LLM cache)
+  python pr_analyzer.py owner/repo --no-llm-cache
+
+  # Disable all caching (always fetch fresh data)
+  python pr_analyzer.py owner/repo --no-cache --no-llm-cache
 
   # Analyze merged PRs only, sorted by merge date
   python pr_analyzer.py owner/repo --state merged --sort-by merged --output merged_prs.yaml
@@ -597,6 +669,10 @@ Examples:
                        help='Resume from previous analysis (skip already analyzed PRs)')
     parser.add_argument('--clear-cache', action='store_true',
                        help='Clear cache for this repository before running')
+    parser.add_argument('--no-llm-cache', action='store_true',
+                       help='Disable LLM result caching (always call LLM for analysis)')
+    parser.add_argument('--clear-llm-cache', action='store_true',
+                       help='Clear LLM cache for this repository before running')
     parser.add_argument('--output', '-o',
                        help='Output YAML file path (default: prs_{repo_name}_{timestamp}.yaml)')
 
@@ -613,12 +689,17 @@ Examples:
             sort_by=args.sort_by,
             cache_dir=args.cache_dir,
             use_cache=not args.no_cache,
-            resume=args.resume
+            resume=args.resume,
+            use_llm_cache=not args.no_llm_cache
         )
 
         # Clear cache if requested
         if args.clear_cache:
             analyzer.clear_cache()
+
+        # Clear LLM cache if requested
+        if args.clear_llm_cache:
+            analyzer.clear_llm_cache()
 
         # Fetch PRs
         prs = analyzer.fetch_prs()
